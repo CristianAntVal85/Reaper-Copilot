@@ -1,6 +1,6 @@
 # Reaper Copilot
 
-Documento maestro del proyecto (v2.2, 14-nov-2026). Es la fuente de verdad: sustituye a los borradores anteriores.
+Documento maestro del proyecto (v2.3, 14-nov-2026). Es la fuente de verdad: sustituye a los borradores anteriores.
 
 Lo leen tres públicos:
 
@@ -271,8 +271,15 @@ En modo `mentor` solo se exponen las de lectura.
 - IPC por archivos en el workspace: `inbox/` (peticiones) y `outbox/` (respuestas), con escritura atómica (archivo temporal y renombrado).
 - Petición: `{ id, method, params, schemaVersion }`. Respuesta: `{ id, ok, result | error }`.
 - Lista cerrada de métodos, validados a ambos lados. Cada método mutante se envuelve en un bloque de deshacer.
-- Un solo cliente a la vez (archivo de bloqueo).
-- Tanto en desarrollo (WSL) como en el servidor (Ubuntu), Reaper y el backend comparten sistema de archivos: no hay traducción de rutas.
+- Un solo cliente y una sola instancia de Reaper a la vez: el archivo de bloqueo identifica a ambos. Los nombres de archivo en `inbox/` y `outbox/` son únicos, porque en Windows el renombrado no sobrescribe.
+- **Dónde corre Reaper.** En desarrollo, Reaper es nativo de Windows y el resto (servidor MCP, Node, Python) corre en WSL; la interfaz de Reaper por WSLg no es usable. En el servidor, Reaper para Linux comparte sistema de archivos con el backend.
+- **El workspace y el IPC viven en el sistema de archivos de Linux.** En desarrollo, Reaper los alcanza por `\\wsl.localhost\<distribución>\...`.
+- **Traducción de rutas en el adaptador de Reaper**, en los dos sentidos: de Linux a UNC en lo que envía y de UNC a Linux en lo que recibe. Es configuración del adaptador; en el servidor es la identidad. El núcleo y las herramientas solo ven rutas de Linux.
+- **El puente no se fía de los valores de retorno de Reaper.** Antes de importar comprueba que el archivo existe, y después que el item tiene duración mayor que cero: una ruta sin traducir crea un item vacío sin dar error.
+- **El render es síncrono dentro del puente:** mientras renderiza no atiende nada. El trabajo asíncrono (`jobId`, `get_job_status`) vive en el adaptador, que espera la respuesta y contesta el estado sin preguntar a Reaper. La señal de vida del puente indica cuándo está renderizando, porque un latido se congela.
+- **Carga del puente.** En desarrollo, `reaper.exe -nonewinst bridge.lua` lo carga en el Reaper ya abierto. En Linux eso arranca otra instancia: en el servidor el puente se pasa como argumento al arrancar Reaper.
+- **Detalles de ReaScript:** el listado de `reaper.EnumerateFiles` se refresca con índice `-1` en cada ciclo, y el JSON se codifica dentro de `bridge.lua` (Lua no lo trae).
+- Origen de estas decisiones: `specs/spikes/reaper-bridge-wsl.md` y `specs/spikes/reaper-bridge-windows.md`.
 
 ---
 
@@ -366,9 +373,9 @@ Un criterio es un dato, no texto libre. El esquema vive en zod en `libs/core` y 
 ```mermaid
 flowchart LR
     subgraph DEV["PC de desarrollo (Windows + WSL)"]
-        CC["Claude Code<br/>(suscripción Pro)"] --> MCPS["Servidor MCP"]
-        MCPS --> RD["Reaper"]
-        MCPS --> PD["Python"]
+        CC["Claude Code en WSL<br/>(suscripción Pro)"] --> MCPS["Servidor MCP en WSL"]
+        MCPS -- "IPC por archivos" --> RD["Reaper nativo en Windows"]
+        MCPS --> PD["Python en WSL"]
     end
     subgraph HOST["Hosting estático"]
         REP["Sitio Replay<br/>Angular + JSON + audio"]
@@ -387,7 +394,7 @@ flowchart LR
 
 | Entorno | Equipo | Qué corre | Para qué |
 |---|---|---|---|
-| **Desarrollo** | PC del autor: Ryzen AI 7, 32 GB RAM, Windows con WSL | Claude Code, VS Code, servidor MCP, Reaper, Python, todo en WSL | Desarrollar, usar el bloque MCP, grabar ejecuciones para el Replay |
+| **Desarrollo** | PC del autor: Ryzen AI 7, 32 GB RAM, Windows con WSL | Claude Code, VS Code, servidor MCP y Python en WSL; Reaper nativo en Windows | Desarrollar, usar el bloque MCP, grabar ejecuciones para el Replay |
 | **Hosting estático** | Servicio gratuito (GitHub Pages o Cloudflare Pages) *(a comprobar)* | Sitio Replay | Portfolio siempre disponible |
 | **Servidor Live** | Portátil viejo: Intel i3, 8 GB RAM, 256 GB, Ubuntu | API NestJS, agente, Reaper sin pantalla, Python, SQLite, túnel | Demo en vivo |
 | **Externos** | Anthropic, GitHub | API de Claude (solo Live), repositorio | — |
@@ -487,7 +494,7 @@ El spike de Reaper sin pantalla puede adelantarse a la fase 0 si el portátil es
 - **Backend Live:** NestJS. **Frontend:** Angular.
 - **LLM (solo Live):** `@anthropic-ai/sdk`. Su `toolRunner` está en beta; alternativa: un bucle propio detrás de `LlmPort`.
 - **Python 3.11+:** librosa, pyloudnorm, numpy, scipy, soundfile.
-- **Reaper** para Linux con puente en Lua y plugins de serie. **ffmpeg**. **SQLite**.
+- **Reaper** con puente en Lua y plugins de serie: nativo de Windows en desarrollo, para Linux en el servidor. **ffmpeg**. **SQLite**.
 
 ### 14.2 Pruebas
 
@@ -516,6 +523,7 @@ El spike de Reaper sin pantalla puede adelantarse a la fase 0 si el portátil es
 | Abuso o gasto en Live | Invitación, límites, tope mensual, sin subida de archivos |
 | Funciones MCP avanzadas no disponibles en todas las superficies | Usar solo herramientas estándar |
 | `toolRunner` en beta | Bucle propio detrás de `LlmPort` |
+| Dos sistemas operativos para Reaper (Windows en desarrollo, Linux en el servidor) | Un solo `bridge.lua`; traducción de rutas aislada en el adaptador; el puente verifica lo que hace |
 
 ### 15.2 Preguntas abiertas
 
