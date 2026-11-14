@@ -6,7 +6,7 @@ Memoria entre sesiones. **Máximo 30 líneas, una idea por línea.** Lo que ya n
 
 ## Dónde estamos
 - Fase en curso: F0-spikes (sin empezar).
-- Rama: ninguna todavía. El repositorio git no está creado.
+- Rama: `main`, con el commit inicial.
 
 ## Siguiente paso
 - `/spike reaper-bridge-wsl`: Reaper en WSL ejecuta `bridge.lua` y responde por IPC.

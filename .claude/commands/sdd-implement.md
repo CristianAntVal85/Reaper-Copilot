@@ -1,9 +1,9 @@
 ---
 description: SDD · Implementa tareas de un plan aprobado (uso - /sdd-implement F1-mcp-analisis T3, o sin tarea para seguir en orden)
 ---
-Implementa las tareas de `specs/$1/plan.md` siguiendo la skill sdd. Si indico una tarea ($2), solo esa; si no, continúa en orden desde la primera pendiente. Implementa tú, en este hilo; usa el subagente `implementer` solo si te lo pido o si el contexto se está agotando (sección 7 de la skill).
+Implementa las tareas de `specs/$1/plan.md` siguiendo la skill sdd. Si indico una tarea ($2), solo esa; si no, continúa en orden desde la primera pendiente. No implementes tú: lanza el subagente `implementer` (Sonnet), una llamada por tarea, y pásale la ruta del plan, la tarea, mis decisiones y el resultado de la tarea anterior (sección 7 de la skill). No releas el código que escribe ni repitas su `pnpm check`: fíate de su respuesta y comprueba solo que el commit existe.
 
-Por cada tarea:
+Cada tarea, en el implementador:
 1. Contrato primero si toca una frontera; prueba primero o junto al cambio.
 2. Implementa lo mínimo que cumple el «Hecho cuando».
 3. Ejecuta `pnpm check`. Si falla, corrige; no hay commit en rojo.

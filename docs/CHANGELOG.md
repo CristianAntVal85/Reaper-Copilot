@@ -5,6 +5,6 @@ Entradas nuevas arriba. Una línea por cambio relevante: fecha, fase o vía, qu�
 ## 2026-11-14
 - Documento maestro v2.2: contrato de criterios en la sección 9.2 (criterios fijados en `start_task`, base `absolute` o `delta`, criterios derivados de `target`, estado `unmeasured`); pregunta abierta 10.
 - Documento maestro v2.2: fase 0b de andamiaje en la sección 13.
-- Flujo: el hilo principal planifica e implementa; se elimina el subagente `planner`; `implementer` pasa a opcional.
+- Flujo: el hilo principal planifica y orquesta con el modelo de la sesión; `implementer` y revisores implementan y validan con Sonnet; `/quick` y `/feature` fijan Sonnet. Se elimina el subagente `planner`.
 - Flujo: `.claude/settings.json` con permisos denegados y `.gitignore`.
 - Diseño inicial: `docs/reaper-copilot.md` v2.1.

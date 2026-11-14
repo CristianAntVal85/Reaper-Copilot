@@ -1,5 +1,6 @@
 ---
 description: Vía de cambio pequeño · una función o ajuste con su prueba (uso - /feature añade el factor de cresta al análisis)
+model: claude-sonnet-5-5
 ---
 Cambio pequeño: $ARGUMENTS
 

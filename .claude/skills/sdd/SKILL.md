@@ -1,6 +1,6 @@
 ---
 name: sdd
-description: Úsala siempre que vayas a cambiar código de Reaper Copilot - elegir la vía (directa, cambio pequeño, spike o hito), planificar una fase en specs/Fn-nombre/, implementar tareas, verificar, hacer commits o validar una fase. También para decidir cuándo usar los subagentes revisores y el implementer.
+description: Úsala siempre que vayas a cambiar código de Reaper Copilot - elegir la vía (directa, cambio pequeño, spike o hito), planificar una fase en specs/Fn-nombre/, implementar tareas, verificar, hacer commits o validar una fase. También para orquestar los subagentes implementer y reviewer.
 ---
 
 # Flujo de trabajo de Reaper Copilot
@@ -88,10 +88,11 @@ Máximo 2 vueltas de correcciones. Las observaciones de gravedad baja no bloquea
 
 ## 7. Orquestación con subagentes
 
-Por defecto, **el hilo principal planifica e implementa**. Los subagentes arrancan sin contexto y gastan cuota: se usan donde una mirada nueva aporta.
-- **Plan:** siempre en el hilo principal, porque planificar exige preguntar al usuario. No hay subagente planificador.
-- **Implementación:** en el hilo principal, tarea a tarea. El `implementer` es opcional: solo si el usuario lo pide o si la fase es larga y el contexto del hilo se está agotando. Una llamada por tarea.
-- **Revisión:** siempre con subagentes (sección 5); su valor es que no han visto la conversación.
+Reparto por modelo, para estirar la suscripción: **el modelo caro piensa, Sonnet escribe.**
+- **Plan:** en el hilo principal, con el modelo de la sesión (el más capaz disponible), porque planificar exige preguntar al usuario. No hay subagente planificador.
+- **Implementación:** con el subagente `implementer` (Sonnet), una llamada por tarea. El hilo principal solo orquesta: lanza la tarea, lee la respuesta y pasa a la siguiente. No relee el código ni repite las verificaciones del implementador.
+- **Revisión:** con los subagentes revisores (Sonnet, sección 5); su valor es que no han visto la conversación.
+- **Vías directa y de cambio pequeño:** en el hilo principal, pero sus comandos fijan Sonnet en la cabecera.
 - Los subagentes no ven la conversación. Pásales: la ruta de `plan.md`, la tarea, las decisiones del usuario y el resultado de la tarea anterior. Con la sección «Contexto para el implementador» no necesitan releer el documento maestro.
 
 ## 8. Cambios de alcance

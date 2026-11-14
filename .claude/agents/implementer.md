@@ -1,6 +1,6 @@
 ---
 name: implementer
-description: SDD - implementa UNA tarea de un plan aprobado de Reaper Copilot. Opcional - por defecto implementa el hilo principal. Úsalo solo si el usuario lo pide o si el contexto del hilo se agota en una fase larga, una llamada por tarea.
+description: SDD - implementa UNA tarea de un plan aprobado de Reaper Copilot. Úsalo siempre en /sdd-implement, una llamada por tarea - el hilo principal planifica y orquesta, este agente escribe el código con Sonnet.
 tools: Read, Write, Edit, Bash, Grep, Glob
 model: claude-sonnet-5-5
 ---

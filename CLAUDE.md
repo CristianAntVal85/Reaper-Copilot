@@ -38,7 +38,7 @@ Dependencias: `core` ← `tools` ← `agent` ← `apps`. Los adaptadores solo de
 
 ## Entorno
 
-Todo corre en WSL: Claude Code, Reaper, Node y Python. Suscripción Claude Pro: los subagentes consumen cuota. Se planifica e implementa en el hilo principal; los subagentes son para revisar al cerrar una fase. Nunca exportes `ANTHROPIC_API_KEY` en el entorno global.
+Todo corre en WSL: Claude Code, Reaper, Node y Python. Suscripción Claude Pro: los subagentes consumen cuota. Reparto: el hilo principal (modelo más capaz) planifica y orquesta; el subagente `implementer` y los revisores (Sonnet) implementan y validan. Nunca exportes `ANTHROPIC_API_KEY` en el entorno global.
 
 ## Idioma
 

@@ -1,5 +1,6 @@
 ---
 description: Vía directa · cambio trivial sin plan ni subagentes (uso - /quick mueve el botón de exportar a la cabecera)
+model: claude-sonnet-5-5
 ---
 Cambio trivial: $ARGUMENTS
 
