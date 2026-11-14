@@ -63,7 +63,7 @@ Sobre la autocorrelación de la envolvente de ataques (`hop_length=64`), se punt
 
 ## Qué se decide
 
-Propuesta, pendiente de aprobar:
+Aprobado por el autor el 2026-11-14 y recogido en el documento maestro v2.4 (sección 8.1):
 
 1. **No usar `librosa.feature.tempo` como medida final.** El análisis de tempo es: envolvente de ataques con `hop_length=64` y búsqueda fina sobre la autocorrelación. Con librosa como base, sin dependencias nuevas.
 2. **Con tempo objetivo, se busca en ±4 % alrededor.** Sin él, en el rango del género (140-230), y las alternativas mitad y doble se devuelven igualmente.
@@ -71,7 +71,7 @@ Propuesta, pendiente de aprobar:
 4. **La tolerancia de ±1 BPM del criterio derivado es alcanzable** con el refinado; con `librosa.feature.tempo` no lo sería. Se mantiene ±1.
 5. **Fragmentos de 4 compases sin pista no son del todo fiables** (16 de 18): el criterio de duración sigue siendo la comprobación principal del tempo, como ya dice la sección 9.2.
 
-Cambios que implicaría en el documento maestro: sección 8.1 (método de tempo y significado de `confidence`) y pregunta abierta 10 (umbral 0,10).
+Cambió el documento maestro: sección 8.1 y preguntas abiertas 10 y 11.
 
 ## Qué queda abierto
 

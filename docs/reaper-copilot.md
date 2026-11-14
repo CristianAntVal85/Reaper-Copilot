@@ -1,6 +1,6 @@
 # Reaper Copilot
 
-Documento maestro del proyecto (v2.3, 14-nov-2026). Es la fuente de verdad: sustituye a los borradores anteriores.
+Documento maestro del proyecto (v2.4, 14-nov-2026). Es la fuente de verdad: sustituye a los borradores anteriores.
 
 Lo leen tres públicos:
 
@@ -247,7 +247,7 @@ En modo `mentor` solo se exponen las de lectura.
 
 ### 8.1 TypeScript con Python
 
-- CLI: `python -m analysis analyze <ruta>` y `python -m analysis compare <a> <b>`.
+- CLI: `python -m analysis analyze <ruta> [--target-bpm N]` y `python -m analysis compare <a> <b>`.
 - Salida JSON por stdout; errores por stderr con código de salida distinto de cero.
 
 ```json
@@ -263,7 +263,11 @@ En modo `mentor` solo se exponen las de lectura.
 ```
 
 - El esquema vive en zod; hay tests de contrato contra la salida real de Python.
-- La detección de BPM es menos fiable por encima de ~200 BPM y puede dar el doble o la mitad: se devuelven siempre alternativas y, si existe, se usa el tempo objetivo como pista.
+- **Método de tempo.** `librosa.feature.tempo` no se usa como medida final: sin pista cae a la mitad entre 180 y 210 BPM, y su resolución no permite afinar a ±1 BPM. El tempo se obtiene con una búsqueda fina (pasos de 0,05 BPM) sobre la autocorrelación de la envolvente de ataques, calculada con librosa y `hop_length=64`, puntuando cada candidato a 1, 2, 4 y 8 tiempos.
+- **Rango de búsqueda.** Con tempo objetivo, ±4 % alrededor. Sin él, el rango del género (140-230 BPM). En ambos casos se devuelven las alternativas mitad y doble.
+- **`tempo.confidence` es la puntuación de esa búsqueda** (0 a 1). Por debajo de 0,10 el tempo no se considera medible y el criterio de BPM devuelve `unmeasured` (sección 9.2). Umbral provisional.
+- Fragmentos de 4 compases sin tempo objetivo no son del todo fiables: por eso la comprobación principal del tempo es la duración (sección 9.2).
+- Origen: `specs/spikes/librosa-bpm-alto.md`.
 
 ### 8.2 TypeScript con Reaper
 
@@ -518,7 +522,7 @@ El spike de Reaper sin pantalla puede adelantarse a la fase 0 si el portátil es
 |---|---|
 | Reaper es de una sola instancia: no escala a muchos usuarios | Cola de una ejecución; el Replay no depende de Reaper. Escalar exigiría una instancia por sesión y revisar la licencia |
 | Reaper sin pantalla en el portátil no funciona como se espera | Spike temprano; plan B: sesión gráfica mínima |
-| BPM poco fiable por encima de ~200 | Alternativas mitad y doble; tempo objetivo como pista |
+| BPM poco fiable en fragmentos cortos o sin bombo | Búsqueda fina con el tempo objetivo como pista; confianza y estado `unmeasured`; la duración como comprobación principal |
 | El portátil o la conexión de casa se caen | El Replay vive en hosting estático; indicador de disponibilidad |
 | Abuso o gasto en Live | Invitación, límites, tope mensual, sin subida de archivos |
 | Funciones MCP avanzadas no disponibles en todas las superficies | Usar solo herramientas estándar |
@@ -536,7 +540,8 @@ El spike de Reaper sin pantalla puede adelantarse a la fase 0 si el portátil es
 7. Nombres y parámetros finales de los presets de FX para hardstyle y hardcore.
 8. Licencia de la documentación de Reaper: si permite ofrecer la búsqueda en el modo Live público.
 9. Modelo de embeddings local y extensión vectorial de SQLite para la búsqueda en documentación.
-10. Tolerancias por defecto de los criterios derivados (±20 ms de duración, ±1 BPM) y umbral de confianza para `unmeasured`: ajustar con los resultados del spike de librosa.
+10. Umbral de confianza para `unmeasured` (0,10, provisional): sale de 36 fragmentos de temas masterizados, con poco margen. Revisarlo con loops sueltos, breaks sin bombo y audio estirado por Reaper. La tolerancia de ±1 BPM queda confirmada; la de ±20 ms de duración, sin probar.
+11. Cómo detectar el primer tiempo del compás para `slice_loop`: no se validó en el spike (hace falta material en WAV con el primer tiempo conocido).
 
 ---
 

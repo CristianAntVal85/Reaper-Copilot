@@ -9,17 +9,16 @@ Memoria entre sesiones. **Máximo 30 líneas, una idea por línea.** Lo que ya n
 - Rama: `fase/F0-spikes`, en remoto.
 
 ## Siguiente paso
-- `/sdd-plan F0b-andamiaje` (Nx, `pnpm check`, entorno de Python, CI). Antes: pull request de `fase/F0-spikes` a `main`.
+- `/sdd-plan F0b-andamiaje` (Nx, `pnpm check`, entorno de Python, CI). Antes: fusionar la pull request de `fase/F0-spikes`.
 
 ## Hecho
-- Diseño en `docs/reaper-copilot.md` v2.3 (Reaper en Windows con traducción de rutas, sección 8.2).
+- Diseño en `docs/reaper-copilot.md` v2.4 (Reaper en Windows, sección 8.2; método de tempo, sección 8.1).
 - Spike `reaper-bridge-wsl`: el IPC por archivos funciona; la interfaz por WSLg no es usable.
 - Spike `reaper-bridge-windows`: el puente funciona en Reaper de Windows con el IPC en WSL (mediana 32 ms).
 - Spike `mcp-minimo`: funciona en terminal y VS Code con zod 4; el cliente no pidió permiso para ninguna herramienta.
 - Spike `librosa-bpm-alto`: `feature.tempo` no basta; un refinado propio acierta los 6 temas a 0,25 BPM o menos.
 
 ## Pendiente de decidir (usuario)
-- Aprobar la propuesta de `specs/spikes/librosa-bpm-alto.md` (método de tempo, confianza, cambios en 8.1).
 - Idioma del README y de la interfaz del Replay.
 - Muestras de audio para Replay y Live.
 - Hosting estático y túnel definitivos.
