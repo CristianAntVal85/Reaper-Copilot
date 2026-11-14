@@ -1,6 +1,6 @@
 # Reaper Copilot
 
-Documento maestro del proyecto (v2.2, 14-nov-2026). Es la fuente de verdad: sustituye a los borradores anteriores.
+Documento maestro del proyecto (v2.4, 14-nov-2026). Es la fuente de verdad: sustituye a los borradores anteriores.
 
 Lo leen tres públicos:
 
@@ -247,7 +247,7 @@ En modo `mentor` solo se exponen las de lectura.
 
 ### 8.1 TypeScript con Python
 
-- CLI: `python -m analysis analyze <ruta>` y `python -m analysis compare <a> <b>`.
+- CLI: `python -m analysis analyze <ruta> [--target-bpm N]` y `python -m analysis compare <a> <b>`.
 - Salida JSON por stdout; errores por stderr con código de salida distinto de cero.
 
 ```json
@@ -263,7 +263,11 @@ En modo `mentor` solo se exponen las de lectura.
 ```
 
 - El esquema vive en zod; hay tests de contrato contra la salida real de Python.
-- La detección de BPM es menos fiable por encima de ~200 BPM y puede dar el doble o la mitad: se devuelven siempre alternativas y, si existe, se usa el tempo objetivo como pista.
+- **Método de tempo.** `librosa.feature.tempo` no se usa como medida final: sin pista cae a la mitad entre 180 y 210 BPM, y su resolución no permite afinar a ±1 BPM. El tempo se obtiene con una búsqueda fina (pasos de 0,05 BPM) sobre la autocorrelación de la envolvente de ataques, calculada con librosa y `hop_length=64`, puntuando cada candidato a 1, 2, 4 y 8 tiempos.
+- **Rango de búsqueda.** Con tempo objetivo, ±4 % alrededor. Sin él, el rango del género (140-230 BPM). En ambos casos se devuelven las alternativas mitad y doble.
+- **`tempo.confidence` es la puntuación de esa búsqueda** (0 a 1). Por debajo de 0,10 el tempo no se considera medible y el criterio de BPM devuelve `unmeasured` (sección 9.2). Umbral provisional.
+- Fragmentos de 4 compases sin tempo objetivo no son del todo fiables: por eso la comprobación principal del tempo es la duración (sección 9.2).
+- Origen: `specs/spikes/librosa-bpm-alto.md`.
 
 ### 8.2 TypeScript con Reaper
 
@@ -271,8 +275,15 @@ En modo `mentor` solo se exponen las de lectura.
 - IPC por archivos en el workspace: `inbox/` (peticiones) y `outbox/` (respuestas), con escritura atómica (archivo temporal y renombrado).
 - Petición: `{ id, method, params, schemaVersion }`. Respuesta: `{ id, ok, result | error }`.
 - Lista cerrada de métodos, validados a ambos lados. Cada método mutante se envuelve en un bloque de deshacer.
-- Un solo cliente a la vez (archivo de bloqueo).
-- Tanto en desarrollo (WSL) como en el servidor (Ubuntu), Reaper y el backend comparten sistema de archivos: no hay traducción de rutas.
+- Un solo cliente y una sola instancia de Reaper a la vez: el archivo de bloqueo identifica a ambos. Los nombres de archivo en `inbox/` y `outbox/` son únicos, porque en Windows el renombrado no sobrescribe.
+- **Dónde corre Reaper.** En desarrollo, Reaper es nativo de Windows y el resto (servidor MCP, Node, Python) corre en WSL; la interfaz de Reaper por WSLg no es usable. En el servidor, Reaper para Linux comparte sistema de archivos con el backend.
+- **El workspace y el IPC viven en el sistema de archivos de Linux.** En desarrollo, Reaper los alcanza por `\\wsl.localhost\<distribución>\...`.
+- **Traducción de rutas en el adaptador de Reaper**, en los dos sentidos: de Linux a UNC en lo que envía y de UNC a Linux en lo que recibe. Es configuración del adaptador; en el servidor es la identidad. El núcleo y las herramientas solo ven rutas de Linux.
+- **El puente no se fía de los valores de retorno de Reaper.** Antes de importar comprueba que el archivo existe, y después que el item tiene duración mayor que cero: una ruta sin traducir crea un item vacío sin dar error.
+- **El render es síncrono dentro del puente:** mientras renderiza no atiende nada. El trabajo asíncrono (`jobId`, `get_job_status`) vive en el adaptador, que espera la respuesta y contesta el estado sin preguntar a Reaper. La señal de vida del puente indica cuándo está renderizando, porque un latido se congela.
+- **Carga del puente.** En desarrollo, `reaper.exe -nonewinst bridge.lua` lo carga en el Reaper ya abierto. En Linux eso arranca otra instancia: en el servidor el puente se pasa como argumento al arrancar Reaper.
+- **Detalles de ReaScript:** el listado de `reaper.EnumerateFiles` se refresca con índice `-1` en cada ciclo, y el JSON se codifica dentro de `bridge.lua` (Lua no lo trae).
+- Origen de estas decisiones: `specs/spikes/reaper-bridge-wsl.md` y `specs/spikes/reaper-bridge-windows.md`.
 
 ---
 
@@ -366,9 +377,9 @@ Un criterio es un dato, no texto libre. El esquema vive en zod en `libs/core` y 
 ```mermaid
 flowchart LR
     subgraph DEV["PC de desarrollo (Windows + WSL)"]
-        CC["Claude Code<br/>(suscripción Pro)"] --> MCPS["Servidor MCP"]
-        MCPS --> RD["Reaper"]
-        MCPS --> PD["Python"]
+        CC["Claude Code en WSL<br/>(suscripción Pro)"] --> MCPS["Servidor MCP en WSL"]
+        MCPS -- "IPC por archivos" --> RD["Reaper nativo en Windows"]
+        MCPS --> PD["Python en WSL"]
     end
     subgraph HOST["Hosting estático"]
         REP["Sitio Replay<br/>Angular + JSON + audio"]
@@ -387,7 +398,7 @@ flowchart LR
 
 | Entorno | Equipo | Qué corre | Para qué |
 |---|---|---|---|
-| **Desarrollo** | PC del autor: Ryzen AI 7, 32 GB RAM, Windows con WSL | Claude Code, VS Code, servidor MCP, Reaper, Python, todo en WSL | Desarrollar, usar el bloque MCP, grabar ejecuciones para el Replay |
+| **Desarrollo** | PC del autor: Ryzen AI 7, 32 GB RAM, Windows con WSL | Claude Code, VS Code, servidor MCP y Python en WSL; Reaper nativo en Windows | Desarrollar, usar el bloque MCP, grabar ejecuciones para el Replay |
 | **Hosting estático** | Servicio gratuito (GitHub Pages o Cloudflare Pages) *(a comprobar)* | Sitio Replay | Portfolio siempre disponible |
 | **Servidor Live** | Portátil viejo: Intel i3, 8 GB RAM, 256 GB, Ubuntu | API NestJS, agente, Reaper sin pantalla, Python, SQLite, túnel | Demo en vivo |
 | **Externos** | Anthropic, GitHub | API de Claude (solo Live), repositorio | — |
@@ -487,7 +498,7 @@ El spike de Reaper sin pantalla puede adelantarse a la fase 0 si el portátil es
 - **Backend Live:** NestJS. **Frontend:** Angular.
 - **LLM (solo Live):** `@anthropic-ai/sdk`. Su `toolRunner` está en beta; alternativa: un bucle propio detrás de `LlmPort`.
 - **Python 3.11+:** librosa, pyloudnorm, numpy, scipy, soundfile.
-- **Reaper** para Linux con puente en Lua y plugins de serie. **ffmpeg**. **SQLite**.
+- **Reaper** con puente en Lua y plugins de serie: nativo de Windows en desarrollo, para Linux en el servidor. **ffmpeg**. **SQLite**.
 
 ### 14.2 Pruebas
 
@@ -511,11 +522,12 @@ El spike de Reaper sin pantalla puede adelantarse a la fase 0 si el portátil es
 |---|---|
 | Reaper es de una sola instancia: no escala a muchos usuarios | Cola de una ejecución; el Replay no depende de Reaper. Escalar exigiría una instancia por sesión y revisar la licencia |
 | Reaper sin pantalla en el portátil no funciona como se espera | Spike temprano; plan B: sesión gráfica mínima |
-| BPM poco fiable por encima de ~200 | Alternativas mitad y doble; tempo objetivo como pista |
+| BPM poco fiable en fragmentos cortos o sin bombo | Búsqueda fina con el tempo objetivo como pista; confianza y estado `unmeasured`; la duración como comprobación principal |
 | El portátil o la conexión de casa se caen | El Replay vive en hosting estático; indicador de disponibilidad |
 | Abuso o gasto en Live | Invitación, límites, tope mensual, sin subida de archivos |
 | Funciones MCP avanzadas no disponibles en todas las superficies | Usar solo herramientas estándar |
 | `toolRunner` en beta | Bucle propio detrás de `LlmPort` |
+| Dos sistemas operativos para Reaper (Windows en desarrollo, Linux en el servidor) | Un solo `bridge.lua`; traducción de rutas aislada en el adaptador; el puente verifica lo que hace |
 
 ### 15.2 Preguntas abiertas
 
@@ -528,7 +540,8 @@ El spike de Reaper sin pantalla puede adelantarse a la fase 0 si el portátil es
 7. Nombres y parámetros finales de los presets de FX para hardstyle y hardcore.
 8. Licencia de la documentación de Reaper: si permite ofrecer la búsqueda en el modo Live público.
 9. Modelo de embeddings local y extensión vectorial de SQLite para la búsqueda en documentación.
-10. Tolerancias por defecto de los criterios derivados (±20 ms de duración, ±1 BPM) y umbral de confianza para `unmeasured`: ajustar con los resultados del spike de librosa.
+10. Umbral de confianza para `unmeasured` (0,10, provisional): sale de 36 fragmentos de temas masterizados, con poco margen. Revisarlo con loops sueltos, breaks sin bombo y audio estirado por Reaper. La tolerancia de ±1 BPM queda confirmada; la de ±20 ms de duración, sin probar.
+11. Cómo detectar el primer tiempo del compás para `slice_loop`: no se validó en el spike (hace falta material en WAV con el primer tiempo conocido).
 
 ---
 

@@ -22,3 +22,7 @@ spikes/**/out/
 
 # Claude Code (ajustes personales)
 .claude/settings.local.json
+
+# Audio de prueba con derechos de terceros
+.mp3/
+*.mp3

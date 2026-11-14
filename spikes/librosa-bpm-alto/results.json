@@ -1,0 +1,2246 @@
+[
+ {
+  "title": "Uncharted",
+  "truthBpm": 160.0,
+  "durationSec": 199.5,
+  "loadSec": 0.98,
+  "full": {
+   "default@512": {
+    "bpm": 161.5,
+    "class": "ok",
+    "errBpm": 1.5
+   },
+   "hint@512": {
+    "bpm": 161.5,
+    "class": "ok",
+    "errBpm": 1.5
+   },
+   "genre_prior@512": {
+    "bpm": 161.5,
+    "class": "ok",
+    "errBpm": 1.5
+   },
+   "beats_hint@512": {
+    "bpm": 161.5,
+    "class": "ok",
+    "errBpm": 1.5,
+    "firstBeatSec": 0.836,
+    "beats": 515
+   },
+   "seconds@512": 1.41,
+   "default@128": {
+    "bpm": 159.01,
+    "class": "ok",
+    "errBpm": -0.99
+   },
+   "hint@128": {
+    "bpm": 159.01,
+    "class": "ok",
+    "errBpm": -0.99
+   },
+   "genre_prior@128": {
+    "bpm": 159.01,
+    "class": "ok",
+    "errBpm": -0.99
+   },
+   "beats_hint@128": {
+    "bpm": 161.5,
+    "class": "ok",
+    "errBpm": 1.5,
+    "firstBeatSec": 0.824,
+    "beats": 519
+   },
+   "seconds@128": 5.51
+  },
+  "segments": [
+   {
+    "bars": 4,
+    "startSec": 49.9,
+    "lenSec": 6.0,
+    "est": {
+     "default@512": {
+      "bpm": 143.55,
+      "class": "wrong",
+      "errBpm": -16.45
+     },
+     "hint@512": {
+      "bpm": 198.77,
+      "class": "wrong",
+      "errBpm": 38.77
+     },
+     "genre_prior@512": {
+      "bpm": 198.77,
+      "class": "wrong",
+      "errBpm": 38.77
+     },
+     "beats_hint@512": {
+      "bpm": 198.77,
+      "class": "wrong",
+      "errBpm": 38.77,
+      "firstBeatSec": 0.65,
+      "beats": 18
+     },
+     "seconds@512": 0.01,
+     "default@128": {
+      "bpm": 139.67,
+      "class": "wrong",
+      "errBpm": -20.33
+     },
+     "hint@128": {
+      "bpm": 195.02,
+      "class": "wrong",
+      "errBpm": 35.02
+     },
+     "genre_prior@128": {
+      "bpm": 198.77,
+      "class": "wrong",
+      "errBpm": 38.77
+     },
+     "beats_hint@128": {
+      "bpm": 206.72,
+      "class": "wrong",
+      "errBpm": 46.72,
+      "firstBeatSec": 0.43,
+      "beats": 19
+     },
+     "seconds@128": 0.22
+    }
+   },
+   {
+    "bars": 4,
+    "startSec": 99.8,
+    "lenSec": 6.0,
+    "est": {
+     "default@512": {
+      "bpm": 107.67,
+      "class": "2/3",
+      "errBpm": -52.33
+     },
+     "hint@512": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5
+     },
+     "genre_prior@512": {
+      "bpm": 215.33,
+      "class": "4/3",
+      "errBpm": 55.33
+     },
+     "beats_hint@512": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5,
+      "firstBeatSec": 0.07,
+      "beats": 16
+     },
+     "seconds@512": 0.03,
+     "default@128": {
+      "bpm": 106.56,
+      "class": "2/3",
+      "errBpm": -53.44
+     },
+     "hint@128": {
+      "bpm": 159.01,
+      "class": "ok",
+      "errBpm": -0.99
+     },
+     "genre_prior@128": {
+      "bpm": 215.33,
+      "class": "4/3",
+      "errBpm": 55.33
+     },
+     "beats_hint@128": {
+      "bpm": 162.77,
+      "class": "ok",
+      "errBpm": 2.77,
+      "firstBeatSec": 0.064,
+      "beats": 17
+     },
+     "seconds@128": 0.24
+    }
+   },
+   {
+    "bars": 4,
+    "startSec": 149.7,
+    "lenSec": 6.0,
+    "est": {
+     "default@512": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5
+     },
+     "hint@512": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5
+     },
+     "genre_prior@512": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5
+     },
+     "beats_hint@512": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5,
+      "firstBeatSec": 2.299,
+      "beats": 10
+     },
+     "seconds@512": 0.02,
+     "default@128": {
+      "bpm": 159.01,
+      "class": "ok",
+      "errBpm": -0.99
+     },
+     "hint@128": {
+      "bpm": 159.01,
+      "class": "ok",
+      "errBpm": -0.99
+     },
+     "genre_prior@128": {
+      "bpm": 159.01,
+      "class": "ok",
+      "errBpm": -0.99
+     },
+     "beats_hint@128": {
+      "bpm": 159.01,
+      "class": "ok",
+      "errBpm": -0.99,
+      "firstBeatSec": 2.299,
+      "beats": 8
+     },
+     "seconds@128": 0.22
+    }
+   },
+   {
+    "bars": 16,
+    "startSec": 49.9,
+    "lenSec": 24.0,
+    "est": {
+     "default@512": {
+      "bpm": 129.2,
+      "class": "wrong",
+      "errBpm": -30.8
+     },
+     "hint@512": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5
+     },
+     "genre_prior@512": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5
+     },
+     "beats_hint@512": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5,
+      "firstBeatSec": 0.441,
+      "beats": 63
+     },
+     "seconds@512": 0.07,
+     "default@128": {
+      "bpm": 129.2,
+      "class": "wrong",
+      "errBpm": -30.8
+     },
+     "hint@128": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5
+     },
+     "genre_prior@128": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5
+     },
+     "beats_hint@128": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5,
+      "firstBeatSec": 0.435,
+      "beats": 64
+     },
+     "seconds@128": 0.69
+    }
+   },
+   {
+    "bars": 16,
+    "startSec": 99.8,
+    "lenSec": 24.0,
+    "est": {
+     "default@512": {
+      "bpm": 107.67,
+      "class": "2/3",
+      "errBpm": -52.33
+     },
+     "hint@512": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5
+     },
+     "genre_prior@512": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5
+     },
+     "beats_hint@512": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5,
+      "firstBeatSec": 0.07,
+      "beats": 64
+     },
+     "seconds@512": 0.07,
+     "default@128": {
+      "bpm": 107.67,
+      "class": "2/3",
+      "errBpm": -52.33
+     },
+     "hint@128": {
+      "bpm": 159.01,
+      "class": "ok",
+      "errBpm": -0.99
+     },
+     "genre_prior@128": {
+      "bpm": 159.01,
+      "class": "ok",
+      "errBpm": -0.99
+     },
+     "beats_hint@128": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5,
+      "firstBeatSec": 0.064,
+      "beats": 68
+     },
+     "seconds@128": 0.71
+    }
+   },
+   {
+    "bars": 16,
+    "startSec": 149.7,
+    "lenSec": 24.0,
+    "est": {
+     "default@512": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5
+     },
+     "hint@512": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5
+     },
+     "genre_prior@512": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5
+     },
+     "beats_hint@512": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5,
+      "firstBeatSec": 2.299,
+      "beats": 39
+     },
+     "seconds@512": 0.08,
+     "default@128": {
+      "bpm": 159.01,
+      "class": "ok",
+      "errBpm": -0.99
+     },
+     "hint@128": {
+      "bpm": 159.01,
+      "class": "ok",
+      "errBpm": -0.99
+     },
+     "genre_prior@128": {
+      "bpm": 159.01,
+      "class": "ok",
+      "errBpm": -0.99
+     },
+     "beats_hint@128": {
+      "bpm": 159.01,
+      "class": "ok",
+      "errBpm": -0.99,
+      "firstBeatSec": 2.299,
+      "beats": 39
+     },
+     "seconds@128": 0.76
+    }
+   }
+  ]
+ },
+ {
+  "title": "Voice Of The Underground",
+  "truthBpm": 180.0,
+  "durationSec": 148.2,
+  "loadSec": 0.25,
+  "full": {
+   "default@512": {
+    "bpm": 89.1,
+    "class": "half",
+    "errBpm": -90.9
+   },
+   "hint@512": {
+    "bpm": 184.57,
+    "class": "wrong",
+    "errBpm": 4.57
+   },
+   "genre_prior@512": {
+    "bpm": 184.57,
+    "class": "wrong",
+    "errBpm": 4.57
+   },
+   "beats_hint@512": {
+    "bpm": 184.57,
+    "class": "wrong",
+    "errBpm": 4.57,
+    "firstBeatSec": 0.07,
+    "beats": 438
+   },
+   "seconds@512": 0.29,
+   "default@128": {
+    "bpm": 89.88,
+    "class": "half",
+    "errBpm": -90.12
+   },
+   "hint@128": {
+    "bpm": 181.33,
+    "class": "ok",
+    "errBpm": 1.33
+   },
+   "genre_prior@128": {
+    "bpm": 181.33,
+    "class": "ok",
+    "errBpm": 1.33
+   },
+   "beats_hint@128": {
+    "bpm": 181.33,
+    "class": "ok",
+    "errBpm": 1.33,
+    "firstBeatSec": 0.058,
+    "beats": 439
+   },
+   "seconds@128": 3.85
+  },
+  "segments": [
+   {
+    "bars": 4,
+    "startSec": 37.1,
+    "lenSec": 5.33,
+    "est": {
+     "default@512": {
+      "bpm": 117.45,
+      "class": "wrong",
+      "errBpm": -62.55
+     },
+     "hint@512": {
+      "bpm": 184.57,
+      "class": "wrong",
+      "errBpm": 4.57
+     },
+     "genre_prior@512": {
+      "bpm": 184.57,
+      "class": "wrong",
+      "errBpm": 4.57
+     },
+     "beats_hint@512": {
+      "bpm": 184.57,
+      "class": "wrong",
+      "errBpm": 4.57,
+      "firstBeatSec": 0.372,
+      "beats": 15
+     },
+     "seconds@512": 0.01,
+     "default@128": {
+      "bpm": 120.19,
+      "class": "2/3",
+      "errBpm": -59.81
+     },
+     "hint@128": {
+      "bpm": 181.33,
+      "class": "ok",
+      "errBpm": 1.33
+     },
+     "genre_prior@128": {
+      "bpm": 181.33,
+      "class": "ok",
+      "errBpm": 1.33
+     },
+     "beats_hint@128": {
+      "bpm": 181.33,
+      "class": "ok",
+      "errBpm": 1.33,
+      "firstBeatSec": 0.348,
+      "beats": 15
+     },
+     "seconds@128": 0.18
+    }
+   },
+   {
+    "bars": 4,
+    "startSec": 74.1,
+    "lenSec": 5.33,
+    "est": {
+     "default@512": {
+      "bpm": 89.1,
+      "class": "half",
+      "errBpm": -90.9
+     },
+     "hint@512": {
+      "bpm": 184.57,
+      "class": "wrong",
+      "errBpm": 4.57
+     },
+     "genre_prior@512": {
+      "bpm": 184.57,
+      "class": "wrong",
+      "errBpm": 4.57
+     },
+     "beats_hint@512": {
+      "bpm": 184.57,
+      "class": "wrong",
+      "errBpm": 4.57,
+      "firstBeatSec": 0.116,
+      "beats": 14
+     },
+     "seconds@512": 0.01,
+     "default@128": {
+      "bpm": 89.88,
+      "class": "half",
+      "errBpm": -90.12
+     },
+     "hint@128": {
+      "bpm": 181.33,
+      "class": "ok",
+      "errBpm": 1.33
+     },
+     "genre_prior@128": {
+      "bpm": 181.33,
+      "class": "ok",
+      "errBpm": 1.33
+     },
+     "beats_hint@128": {
+      "bpm": 181.33,
+      "class": "ok",
+      "errBpm": 1.33,
+      "firstBeatSec": 0.099,
+      "beats": 14
+     },
+     "seconds@128": 0.17
+    }
+   },
+   {
+    "bars": 4,
+    "startSec": 111.2,
+    "lenSec": 5.33,
+    "est": {
+     "default@512": {
+      "bpm": 123.05,
+      "class": "wrong",
+      "errBpm": -56.95
+     },
+     "hint@512": {
+      "bpm": 184.57,
+      "class": "wrong",
+      "errBpm": 4.57
+     },
+     "genre_prior@512": {
+      "bpm": 184.57,
+      "class": "wrong",
+      "errBpm": 4.57
+     },
+     "beats_hint@512": {
+      "bpm": 184.57,
+      "class": "wrong",
+      "errBpm": 4.57,
+      "firstBeatSec": 0.07,
+      "beats": 16
+     },
+     "seconds@512": 0.02,
+     "default@128": {
+      "bpm": 120.19,
+      "class": "2/3",
+      "errBpm": -59.81
+     },
+     "hint@128": {
+      "bpm": 181.33,
+      "class": "ok",
+      "errBpm": 1.33
+     },
+     "genre_prior@128": {
+      "bpm": 181.33,
+      "class": "ok",
+      "errBpm": 1.33
+     },
+     "beats_hint@128": {
+      "bpm": 181.33,
+      "class": "ok",
+      "errBpm": 1.33,
+      "firstBeatSec": 0.058,
+      "beats": 16
+     },
+     "seconds@128": 0.18
+    }
+   },
+   {
+    "bars": 16,
+    "startSec": 37.1,
+    "lenSec": 21.33,
+    "est": {
+     "default@512": {
+      "bpm": 117.45,
+      "class": "wrong",
+      "errBpm": -62.55
+     },
+     "hint@512": {
+      "bpm": 184.57,
+      "class": "wrong",
+      "errBpm": 4.57
+     },
+     "genre_prior@512": {
+      "bpm": 184.57,
+      "class": "wrong",
+      "errBpm": 4.57
+     },
+     "beats_hint@512": {
+      "bpm": 184.57,
+      "class": "wrong",
+      "errBpm": 4.57,
+      "firstBeatSec": 5.851,
+      "beats": 44
+     },
+     "seconds@512": 0.06,
+     "default@128": {
+      "bpm": 120.19,
+      "class": "2/3",
+      "errBpm": -59.81
+     },
+     "hint@128": {
+      "bpm": 181.33,
+      "class": "ok",
+      "errBpm": 1.33
+     },
+     "genre_prior@128": {
+      "bpm": 181.33,
+      "class": "ok",
+      "errBpm": 1.33
+     },
+     "beats_hint@128": {
+      "bpm": 181.33,
+      "class": "ok",
+      "errBpm": 1.33,
+      "firstBeatSec": 1.846,
+      "beats": 56
+     },
+     "seconds@128": 0.6
+    }
+   },
+   {
+    "bars": 16,
+    "startSec": 74.1,
+    "lenSec": 21.33,
+    "est": {
+     "default@512": {
+      "bpm": 89.1,
+      "class": "half",
+      "errBpm": -90.9
+     },
+     "hint@512": {
+      "bpm": 184.57,
+      "class": "wrong",
+      "errBpm": 4.57
+     },
+     "genre_prior@512": {
+      "bpm": 184.57,
+      "class": "wrong",
+      "errBpm": 4.57
+     },
+     "beats_hint@512": {
+      "bpm": 184.57,
+      "class": "wrong",
+      "errBpm": 4.57,
+      "firstBeatSec": 0.116,
+      "beats": 64
+     },
+     "seconds@512": 0.07,
+     "default@128": {
+      "bpm": 120.19,
+      "class": "2/3",
+      "errBpm": -59.81
+     },
+     "hint@128": {
+      "bpm": 181.33,
+      "class": "ok",
+      "errBpm": 1.33
+     },
+     "genre_prior@128": {
+      "bpm": 181.33,
+      "class": "ok",
+      "errBpm": 1.33
+     },
+     "beats_hint@128": {
+      "bpm": 181.33,
+      "class": "ok",
+      "errBpm": 1.33,
+      "firstBeatSec": 0.099,
+      "beats": 64
+     },
+     "seconds@128": 0.57
+    }
+   },
+   {
+    "bars": 16,
+    "startSec": 111.2,
+    "lenSec": 21.33,
+    "est": {
+     "default@512": {
+      "bpm": 89.1,
+      "class": "half",
+      "errBpm": -90.9
+     },
+     "hint@512": {
+      "bpm": 184.57,
+      "class": "wrong",
+      "errBpm": 4.57
+     },
+     "genre_prior@512": {
+      "bpm": 184.57,
+      "class": "wrong",
+      "errBpm": 4.57
+     },
+     "beats_hint@512": {
+      "bpm": 184.57,
+      "class": "wrong",
+      "errBpm": 4.57,
+      "firstBeatSec": 8.382,
+      "beats": 39
+     },
+     "seconds@512": 0.05,
+     "default@128": {
+      "bpm": 89.88,
+      "class": "half",
+      "errBpm": -90.12
+     },
+     "hint@128": {
+      "bpm": 181.33,
+      "class": "ok",
+      "errBpm": 1.33
+     },
+     "genre_prior@128": {
+      "bpm": 181.33,
+      "class": "ok",
+      "errBpm": 1.33
+     },
+     "beats_hint@128": {
+      "bpm": 181.33,
+      "class": "ok",
+      "errBpm": 1.33,
+      "firstBeatSec": 8.702,
+      "beats": 38
+     },
+     "seconds@128": 0.53
+    }
+   }
+  ]
+ },
+ {
+  "title": "KCKPRN",
+  "truthBpm": 190.0,
+  "durationSec": 133.9,
+  "loadSec": 0.23,
+  "full": {
+   "default@512": {
+    "bpm": 95.7,
+    "class": "half",
+    "errBpm": -94.3
+   },
+   "hint@512": {
+    "bpm": 184.57,
+    "class": "wrong",
+    "errBpm": -5.43
+   },
+   "genre_prior@512": {
+    "bpm": 184.57,
+    "class": "wrong",
+    "errBpm": -5.43
+   },
+   "beats_hint@512": {
+    "bpm": 184.57,
+    "class": "wrong",
+    "errBpm": -5.43,
+    "firstBeatSec": 0.07,
+    "beats": 391
+   },
+   "seconds@512": 0.3,
+   "default@128": {
+    "bpm": 94.83,
+    "class": "half",
+    "errBpm": -95.17
+   },
+   "hint@128": {
+    "bpm": 191.41,
+    "class": "ok",
+    "errBpm": 1.41
+   },
+   "genre_prior@128": {
+    "bpm": 191.41,
+    "class": "ok",
+    "errBpm": 1.41
+   },
+   "beats_hint@128": {
+    "bpm": 191.41,
+    "class": "ok",
+    "errBpm": 1.41,
+    "firstBeatSec": 0.064,
+    "beats": 394
+   },
+   "seconds@128": 3.53
+  },
+  "segments": [
+   {
+    "bars": 4,
+    "startSec": 33.5,
+    "lenSec": 5.05,
+    "est": {
+     "default@512": {
+      "bpm": 95.7,
+      "class": "half",
+      "errBpm": -94.3
+     },
+     "hint@512": {
+      "bpm": 184.57,
+      "class": "wrong",
+      "errBpm": -5.43
+     },
+     "genre_prior@512": {
+      "bpm": 184.57,
+      "class": "wrong",
+      "errBpm": -5.43
+     },
+     "beats_hint@512": {
+      "bpm": 184.57,
+      "class": "wrong",
+      "errBpm": -5.43,
+      "firstBeatSec": 0.07,
+      "beats": 15
+     },
+     "seconds@512": 0.02,
+     "default@128": {
+      "bpm": 126.05,
+      "class": "2/3",
+      "errBpm": -63.95
+     },
+     "hint@128": {
+      "bpm": 191.41,
+      "class": "ok",
+      "errBpm": 1.41
+     },
+     "genre_prior@128": {
+      "bpm": 191.41,
+      "class": "ok",
+      "errBpm": 1.41
+     },
+     "beats_hint@128": {
+      "bpm": 191.41,
+      "class": "ok",
+      "errBpm": 1.41,
+      "firstBeatSec": 0.064,
+      "beats": 15
+     },
+     "seconds@128": 0.25
+    }
+   },
+   {
+    "bars": 4,
+    "startSec": 67.0,
+    "lenSec": 5.05,
+    "est": {
+     "default@512": {
+      "bpm": 95.7,
+      "class": "half",
+      "errBpm": -94.3
+     },
+     "hint@512": {
+      "bpm": 184.57,
+      "class": "wrong",
+      "errBpm": -5.43
+     },
+     "genre_prior@512": {
+      "bpm": 184.57,
+      "class": "wrong",
+      "errBpm": -5.43
+     },
+     "beats_hint@512": {
+      "bpm": 184.57,
+      "class": "wrong",
+      "errBpm": -5.43,
+      "firstBeatSec": 0.07,
+      "beats": 16
+     },
+     "seconds@512": 0.05,
+     "default@128": {
+      "bpm": 94.83,
+      "class": "half",
+      "errBpm": -95.17
+     },
+     "hint@128": {
+      "bpm": 191.41,
+      "class": "ok",
+      "errBpm": 1.41
+     },
+     "genre_prior@128": {
+      "bpm": 191.41,
+      "class": "ok",
+      "errBpm": 1.41
+     },
+     "beats_hint@128": {
+      "bpm": 191.41,
+      "class": "ok",
+      "errBpm": 1.41,
+      "firstBeatSec": 0.064,
+      "beats": 16
+     },
+     "seconds@128": 0.27
+    }
+   },
+   {
+    "bars": 4,
+    "startSec": 100.4,
+    "lenSec": 5.05,
+    "est": {
+     "default@512": {
+      "bpm": 184.57,
+      "class": "wrong",
+      "errBpm": -5.43
+     },
+     "hint@512": {
+      "bpm": 184.57,
+      "class": "wrong",
+      "errBpm": -5.43
+     },
+     "genre_prior@512": {
+      "bpm": 184.57,
+      "class": "wrong",
+      "errBpm": -5.43
+     },
+     "beats_hint@512": {
+      "bpm": 198.77,
+      "class": "wrong",
+      "errBpm": 8.77,
+      "firstBeatSec": 0.07,
+      "beats": 11
+     },
+     "seconds@512": 0.01,
+     "default@128": {
+      "bpm": 187.93,
+      "class": "ok",
+      "errBpm": -2.07
+     },
+     "hint@128": {
+      "bpm": 191.41,
+      "class": "ok",
+      "errBpm": 1.41
+     },
+     "genre_prior@128": {
+      "bpm": 191.41,
+      "class": "ok",
+      "errBpm": 1.41
+     },
+     "beats_hint@128": {
+      "bpm": 191.41,
+      "class": "ok",
+      "errBpm": 1.41,
+      "firstBeatSec": 0.058,
+      "beats": 11
+     },
+     "seconds@128": 0.2
+    }
+   },
+   {
+    "bars": 16,
+    "startSec": 33.5,
+    "lenSec": 20.21,
+    "est": {
+     "default@512": {
+      "bpm": 95.7,
+      "class": "half",
+      "errBpm": -94.3
+     },
+     "hint@512": {
+      "bpm": 184.57,
+      "class": "wrong",
+      "errBpm": -5.43
+     },
+     "genre_prior@512": {
+      "bpm": 184.57,
+      "class": "wrong",
+      "errBpm": -5.43
+     },
+     "beats_hint@512": {
+      "bpm": 184.57,
+      "class": "wrong",
+      "errBpm": -5.43,
+      "firstBeatSec": 0.07,
+      "beats": 58
+     },
+     "seconds@512": 0.07,
+     "default@128": {
+      "bpm": 126.05,
+      "class": "2/3",
+      "errBpm": -63.95
+     },
+     "hint@128": {
+      "bpm": 191.41,
+      "class": "ok",
+      "errBpm": 1.41
+     },
+     "genre_prior@128": {
+      "bpm": 191.41,
+      "class": "ok",
+      "errBpm": 1.41
+     },
+     "beats_hint@128": {
+      "bpm": 191.41,
+      "class": "ok",
+      "errBpm": 1.41,
+      "firstBeatSec": 0.064,
+      "beats": 58
+     },
+     "seconds@128": 0.68
+    }
+   },
+   {
+    "bars": 16,
+    "startSec": 67.0,
+    "lenSec": 20.21,
+    "est": {
+     "default@512": {
+      "bpm": 95.7,
+      "class": "half",
+      "errBpm": -94.3
+     },
+     "hint@512": {
+      "bpm": 184.57,
+      "class": "wrong",
+      "errBpm": -5.43
+     },
+     "genre_prior@512": {
+      "bpm": 184.57,
+      "class": "wrong",
+      "errBpm": -5.43
+     },
+     "beats_hint@512": {
+      "bpm": 184.57,
+      "class": "wrong",
+      "errBpm": -5.43,
+      "firstBeatSec": 0.07,
+      "beats": 62
+     },
+     "seconds@512": 0.08,
+     "default@128": {
+      "bpm": 94.83,
+      "class": "half",
+      "errBpm": -95.17
+     },
+     "hint@128": {
+      "bpm": 191.41,
+      "class": "ok",
+      "errBpm": 1.41
+     },
+     "genre_prior@128": {
+      "bpm": 191.41,
+      "class": "ok",
+      "errBpm": 1.41
+     },
+     "beats_hint@128": {
+      "bpm": 191.41,
+      "class": "ok",
+      "errBpm": 1.41,
+      "firstBeatSec": 0.064,
+      "beats": 63
+     },
+     "seconds@128": 0.63
+    }
+   },
+   {
+    "bars": 16,
+    "startSec": 100.4,
+    "lenSec": 20.21,
+    "est": {
+     "default@512": {
+      "bpm": 95.7,
+      "class": "half",
+      "errBpm": -94.3
+     },
+     "hint@512": {
+      "bpm": 184.57,
+      "class": "wrong",
+      "errBpm": -5.43
+     },
+     "genre_prior@512": {
+      "bpm": 184.57,
+      "class": "wrong",
+      "errBpm": -5.43
+     },
+     "beats_hint@512": {
+      "bpm": 184.57,
+      "class": "wrong",
+      "errBpm": -5.43,
+      "firstBeatSec": 0.07,
+      "beats": 59
+     },
+     "seconds@512": 0.08,
+     "default@128": {
+      "bpm": 94.83,
+      "class": "half",
+      "errBpm": -95.17
+     },
+     "hint@128": {
+      "bpm": 191.41,
+      "class": "ok",
+      "errBpm": 1.41
+     },
+     "genre_prior@128": {
+      "bpm": 191.41,
+      "class": "ok",
+      "errBpm": 1.41
+     },
+     "beats_hint@128": {
+      "bpm": 191.41,
+      "class": "ok",
+      "errBpm": 1.41,
+      "firstBeatSec": 0.058,
+      "beats": 59
+     },
+     "seconds@128": 0.64
+    }
+   }
+  ]
+ },
+ {
+  "title": "Break Your Face",
+  "truthBpm": 210.0,
+  "durationSec": 170.8,
+  "loadSec": 0.28,
+  "full": {
+   "default@512": {
+    "bpm": 103.36,
+    "class": "half",
+    "errBpm": -106.64
+   },
+   "hint@512": {
+    "bpm": 215.33,
+    "class": "wrong",
+    "errBpm": 5.33
+   },
+   "genre_prior@512": {
+    "bpm": 215.33,
+    "class": "wrong",
+    "errBpm": 5.33
+   },
+   "beats_hint@512": {
+    "bpm": 215.33,
+    "class": "wrong",
+    "errBpm": 5.33,
+    "firstBeatSec": 0.279,
+    "beats": 561
+   },
+   "seconds@512": 0.35,
+   "default@128": {
+    "bpm": 105.47,
+    "class": "half",
+    "errBpm": -104.53
+   },
+   "hint@128": {
+    "bpm": 210.94,
+    "class": "ok",
+    "errBpm": 0.94
+   },
+   "genre_prior@128": {
+    "bpm": 210.94,
+    "class": "ok",
+    "errBpm": 0.94
+   },
+   "beats_hint@128": {
+    "bpm": 210.94,
+    "class": "ok",
+    "errBpm": 0.94,
+    "firstBeatSec": 0.261,
+    "beats": 563
+   },
+   "seconds@128": 4.7
+  },
+  "segments": [
+   {
+    "bars": 4,
+    "startSec": 42.7,
+    "lenSec": 4.57,
+    "est": {
+     "default@512": {
+      "bpm": 103.36,
+      "class": "half",
+      "errBpm": -106.64
+     },
+     "hint@512": {
+      "bpm": 215.33,
+      "class": "wrong",
+      "errBpm": 5.33
+     },
+     "genre_prior@512": {
+      "bpm": 215.33,
+      "class": "wrong",
+      "errBpm": 5.33
+     },
+     "beats_hint@512": {
+      "bpm": 215.33,
+      "class": "wrong",
+      "errBpm": 5.33,
+      "firstBeatSec": 0.07,
+      "beats": 17
+     },
+     "seconds@512": 0.02,
+     "default@128": {
+      "bpm": 105.47,
+      "class": "half",
+      "errBpm": -104.53
+     },
+     "hint@128": {
+      "bpm": 206.72,
+      "class": "ok",
+      "errBpm": -3.28
+     },
+     "genre_prior@128": {
+      "bpm": 206.72,
+      "class": "ok",
+      "errBpm": -3.28
+     },
+     "beats_hint@128": {
+      "bpm": 210.94,
+      "class": "ok",
+      "errBpm": 0.94,
+      "firstBeatSec": 1.329,
+      "beats": 11
+     },
+     "seconds@128": 0.15
+    }
+   },
+   {
+    "bars": 4,
+    "startSec": 85.4,
+    "lenSec": 4.57,
+    "est": {
+     "default@512": {
+      "bpm": 103.36,
+      "class": "half",
+      "errBpm": -106.64
+     },
+     "hint@512": {
+      "bpm": 215.33,
+      "class": "wrong",
+      "errBpm": 5.33
+     },
+     "genre_prior@512": {
+      "bpm": 215.33,
+      "class": "wrong",
+      "errBpm": 5.33
+     },
+     "beats_hint@512": {
+      "bpm": 215.33,
+      "class": "wrong",
+      "errBpm": 5.33,
+      "firstBeatSec": 0.07,
+      "beats": 15
+     },
+     "seconds@512": 0.01,
+     "default@128": {
+      "bpm": 104.4,
+      "class": "half",
+      "errBpm": -105.6
+     },
+     "hint@128": {
+      "bpm": 210.94,
+      "class": "ok",
+      "errBpm": 0.94
+     },
+     "genre_prior@128": {
+      "bpm": 210.94,
+      "class": "ok",
+      "errBpm": 0.94
+     },
+     "beats_hint@128": {
+      "bpm": 215.33,
+      "class": "wrong",
+      "errBpm": 5.33,
+      "firstBeatSec": 0.058,
+      "beats": 14
+     },
+     "seconds@128": 0.13
+    }
+   },
+   {
+    "bars": 4,
+    "startSec": 128.1,
+    "lenSec": 4.57,
+    "est": {
+     "default@512": {
+      "bpm": 103.36,
+      "class": "half",
+      "errBpm": -106.64
+     },
+     "hint@512": {
+      "bpm": 215.33,
+      "class": "wrong",
+      "errBpm": 5.33
+     },
+     "genre_prior@512": {
+      "bpm": 215.33,
+      "class": "wrong",
+      "errBpm": 5.33
+     },
+     "beats_hint@512": {
+      "bpm": 215.33,
+      "class": "wrong",
+      "errBpm": 5.33,
+      "firstBeatSec": 0.511,
+      "beats": 12
+     },
+     "seconds@512": 0.01,
+     "default@128": {
+      "bpm": 105.47,
+      "class": "half",
+      "errBpm": -104.53
+     },
+     "hint@128": {
+      "bpm": 210.94,
+      "class": "ok",
+      "errBpm": 0.94
+     },
+     "genre_prior@128": {
+      "bpm": 210.94,
+      "class": "ok",
+      "errBpm": 0.94
+     },
+     "beats_hint@128": {
+      "bpm": 210.94,
+      "class": "ok",
+      "errBpm": 0.94,
+      "firstBeatSec": 0.221,
+      "beats": 14
+     },
+     "seconds@128": 0.13
+    }
+   },
+   {
+    "bars": 16,
+    "startSec": 42.7,
+    "lenSec": 18.29,
+    "est": {
+     "default@512": {
+      "bpm": 103.36,
+      "class": "half",
+      "errBpm": -106.64
+     },
+     "hint@512": {
+      "bpm": 215.33,
+      "class": "wrong",
+      "errBpm": 5.33
+     },
+     "genre_prior@512": {
+      "bpm": 215.33,
+      "class": "wrong",
+      "errBpm": 5.33
+     },
+     "beats_hint@512": {
+      "bpm": 215.33,
+      "class": "wrong",
+      "errBpm": 5.33,
+      "firstBeatSec": 2.183,
+      "beats": 57
+     },
+     "seconds@512": 0.04,
+     "default@128": {
+      "bpm": 105.47,
+      "class": "half",
+      "errBpm": -104.53
+     },
+     "hint@128": {
+      "bpm": 210.94,
+      "class": "ok",
+      "errBpm": 0.94
+     },
+     "genre_prior@128": {
+      "bpm": 210.94,
+      "class": "ok",
+      "errBpm": 0.94
+     },
+     "beats_hint@128": {
+      "bpm": 210.94,
+      "class": "ok",
+      "errBpm": 0.94,
+      "firstBeatSec": 2.159,
+      "beats": 57
+     },
+     "seconds@128": 0.53
+    }
+   },
+   {
+    "bars": 16,
+    "startSec": 85.4,
+    "lenSec": 18.29,
+    "est": {
+     "default@512": {
+      "bpm": 103.36,
+      "class": "half",
+      "errBpm": -106.64
+     },
+     "hint@512": {
+      "bpm": 215.33,
+      "class": "wrong",
+      "errBpm": 5.33
+     },
+     "genre_prior@512": {
+      "bpm": 215.33,
+      "class": "wrong",
+      "errBpm": 5.33
+     },
+     "beats_hint@512": {
+      "bpm": 215.33,
+      "class": "wrong",
+      "errBpm": 5.33,
+      "firstBeatSec": 0.07,
+      "beats": 65
+     },
+     "seconds@512": 0.04,
+     "default@128": {
+      "bpm": 105.47,
+      "class": "half",
+      "errBpm": -104.53
+     },
+     "hint@128": {
+      "bpm": 210.94,
+      "class": "ok",
+      "errBpm": 0.94
+     },
+     "genre_prior@128": {
+      "bpm": 210.94,
+      "class": "ok",
+      "errBpm": 0.94
+     },
+     "beats_hint@128": {
+      "bpm": 210.94,
+      "class": "ok",
+      "errBpm": 0.94,
+      "firstBeatSec": 0.308,
+      "beats": 55
+     },
+     "seconds@128": 0.56
+    }
+   },
+   {
+    "bars": 16,
+    "startSec": 128.1,
+    "lenSec": 18.29,
+    "est": {
+     "default@512": {
+      "bpm": 103.36,
+      "class": "half",
+      "errBpm": -106.64
+     },
+     "hint@512": {
+      "bpm": 215.33,
+      "class": "wrong",
+      "errBpm": 5.33
+     },
+     "genre_prior@512": {
+      "bpm": 215.33,
+      "class": "wrong",
+      "errBpm": 5.33
+     },
+     "beats_hint@512": {
+      "bpm": 215.33,
+      "class": "wrong",
+      "errBpm": 5.33,
+      "firstBeatSec": 0.511,
+      "beats": 59
+     },
+     "seconds@512": 0.04,
+     "default@128": {
+      "bpm": 105.47,
+      "class": "half",
+      "errBpm": -104.53
+     },
+     "hint@128": {
+      "bpm": 210.94,
+      "class": "ok",
+      "errBpm": 0.94
+     },
+     "genre_prior@128": {
+      "bpm": 210.94,
+      "class": "ok",
+      "errBpm": 0.94
+     },
+     "beats_hint@128": {
+      "bpm": 210.94,
+      "class": "ok",
+      "errBpm": 0.94,
+      "firstBeatSec": 0.493,
+      "beats": 59
+     },
+     "seconds@128": 0.54
+    }
+   }
+  ]
+ },
+ {
+  "title": "You Can't Stop Me",
+  "truthBpm": 200.0,
+  "durationSec": 180.0,
+  "loadSec": 0.29,
+  "full": {
+   "default@512": {
+    "bpm": 99.38,
+    "class": "half",
+    "errBpm": -100.62
+   },
+   "hint@512": {
+    "bpm": 198.77,
+    "class": "ok",
+    "errBpm": -1.23
+   },
+   "genre_prior@512": {
+    "bpm": 198.77,
+    "class": "ok",
+    "errBpm": -1.23
+   },
+   "beats_hint@512": {
+    "bpm": 198.77,
+    "class": "ok",
+    "errBpm": -1.23,
+    "firstBeatSec": 0.975,
+    "beats": 587
+   },
+   "seconds@512": 0.31,
+   "default@128": {
+    "bpm": 100.35,
+    "class": "half",
+    "errBpm": -99.65
+   },
+   "hint@128": {
+    "bpm": 198.77,
+    "class": "ok",
+    "errBpm": -1.23
+   },
+   "genre_prior@128": {
+    "bpm": 198.77,
+    "class": "ok",
+    "errBpm": -1.23
+   },
+   "beats_hint@128": {
+    "bpm": 198.77,
+    "class": "ok",
+    "errBpm": -1.23,
+    "firstBeatSec": 0.964,
+    "beats": 588
+   },
+   "seconds@128": 5.4
+  },
+  "segments": [
+   {
+    "bars": 4,
+    "startSec": 45.0,
+    "lenSec": 4.8,
+    "est": {
+     "default@512": {
+      "bpm": 99.38,
+      "class": "half",
+      "errBpm": -100.62
+     },
+     "hint@512": {
+      "bpm": 198.77,
+      "class": "ok",
+      "errBpm": -1.23
+     },
+     "genre_prior@512": {
+      "bpm": 198.77,
+      "class": "ok",
+      "errBpm": -1.23
+     },
+     "beats_hint@512": {
+      "bpm": 198.77,
+      "class": "ok",
+      "errBpm": -1.23,
+      "firstBeatSec": 0.07,
+      "beats": 16
+     },
+     "seconds@512": 0.01,
+     "default@128": {
+      "bpm": 100.35,
+      "class": "half",
+      "errBpm": -99.65
+     },
+     "hint@128": {
+      "bpm": 198.77,
+      "class": "ok",
+      "errBpm": -1.23
+     },
+     "genre_prior@128": {
+      "bpm": 198.77,
+      "class": "ok",
+      "errBpm": -1.23
+     },
+     "beats_hint@128": {
+      "bpm": 198.77,
+      "class": "ok",
+      "errBpm": -1.23,
+      "firstBeatSec": 0.07,
+      "beats": 16
+     },
+     "seconds@128": 0.17
+    }
+   },
+   {
+    "bars": 4,
+    "startSec": 90.0,
+    "lenSec": 4.8,
+    "est": {
+     "default@512": {
+      "bpm": 99.38,
+      "class": "half",
+      "errBpm": -100.62
+     },
+     "hint@512": {
+      "bpm": 198.77,
+      "class": "ok",
+      "errBpm": -1.23
+     },
+     "genre_prior@512": {
+      "bpm": 198.77,
+      "class": "ok",
+      "errBpm": -1.23
+     },
+     "beats_hint@512": {
+      "bpm": 198.77,
+      "class": "ok",
+      "errBpm": -1.23,
+      "firstBeatSec": 0.07,
+      "beats": 16
+     },
+     "seconds@512": 0.01,
+     "default@128": {
+      "bpm": 100.35,
+      "class": "half",
+      "errBpm": -99.65
+     },
+     "hint@128": {
+      "bpm": 198.77,
+      "class": "ok",
+      "errBpm": -1.23
+     },
+     "genre_prior@128": {
+      "bpm": 198.77,
+      "class": "ok",
+      "errBpm": -1.23
+     },
+     "beats_hint@128": {
+      "bpm": 198.77,
+      "class": "ok",
+      "errBpm": -1.23,
+      "firstBeatSec": 0.354,
+      "beats": 15
+     },
+     "seconds@128": 0.17
+    }
+   },
+   {
+    "bars": 4,
+    "startSec": 135.0,
+    "lenSec": 4.8,
+    "est": {
+     "default@512": {
+      "bpm": 123.05,
+      "class": "wrong",
+      "errBpm": -76.95
+     },
+     "hint@512": {
+      "bpm": 198.77,
+      "class": "ok",
+      "errBpm": -1.23
+     },
+     "genre_prior@512": {
+      "bpm": 172.27,
+      "class": "wrong",
+      "errBpm": -27.73
+     },
+     "beats_hint@512": {
+      "bpm": 184.57,
+      "class": "wrong",
+      "errBpm": -15.43,
+      "firstBeatSec": 0.07,
+      "beats": 14
+     },
+     "seconds@512": 0.01,
+     "default@128": {
+      "bpm": 121.6,
+      "class": "wrong",
+      "errBpm": -78.4
+     },
+     "hint@128": {
+      "bpm": 195.02,
+      "class": "wrong",
+      "errBpm": -4.98
+     },
+     "genre_prior@128": {
+      "bpm": 166.71,
+      "class": "wrong",
+      "errBpm": -33.29
+     },
+     "beats_hint@128": {
+      "bpm": 202.67,
+      "class": "ok",
+      "errBpm": 2.67,
+      "firstBeatSec": 0.058,
+      "beats": 15
+     },
+     "seconds@128": 0.18
+    }
+   },
+   {
+    "bars": 16,
+    "startSec": 45.0,
+    "lenSec": 19.2,
+    "est": {
+     "default@512": {
+      "bpm": 99.38,
+      "class": "half",
+      "errBpm": -100.62
+     },
+     "hint@512": {
+      "bpm": 198.77,
+      "class": "ok",
+      "errBpm": -1.23
+     },
+     "genre_prior@512": {
+      "bpm": 198.77,
+      "class": "ok",
+      "errBpm": -1.23
+     },
+     "beats_hint@512": {
+      "bpm": 198.77,
+      "class": "ok",
+      "errBpm": -1.23,
+      "firstBeatSec": 0.07,
+      "beats": 62
+     },
+     "seconds@512": 0.04,
+     "default@128": {
+      "bpm": 100.35,
+      "class": "half",
+      "errBpm": -99.65
+     },
+     "hint@128": {
+      "bpm": 198.77,
+      "class": "ok",
+      "errBpm": -1.23
+     },
+     "genre_prior@128": {
+      "bpm": 198.77,
+      "class": "ok",
+      "errBpm": -1.23
+     },
+     "beats_hint@128": {
+      "bpm": 198.77,
+      "class": "ok",
+      "errBpm": -1.23,
+      "firstBeatSec": 0.07,
+      "beats": 62
+     },
+     "seconds@128": 0.53
+    }
+   },
+   {
+    "bars": 16,
+    "startSec": 90.0,
+    "lenSec": 19.2,
+    "est": {
+     "default@512": {
+      "bpm": 99.38,
+      "class": "half",
+      "errBpm": -100.62
+     },
+     "hint@512": {
+      "bpm": 198.77,
+      "class": "ok",
+      "errBpm": -1.23
+     },
+     "genre_prior@512": {
+      "bpm": 198.77,
+      "class": "ok",
+      "errBpm": -1.23
+     },
+     "beats_hint@512": {
+      "bpm": 198.77,
+      "class": "ok",
+      "errBpm": -1.23,
+      "firstBeatSec": 0.07,
+      "beats": 59
+     },
+     "seconds@512": 0.04,
+     "default@128": {
+      "bpm": 100.35,
+      "class": "half",
+      "errBpm": -99.65
+     },
+     "hint@128": {
+      "bpm": 198.77,
+      "class": "ok",
+      "errBpm": -1.23
+     },
+     "genre_prior@128": {
+      "bpm": 198.77,
+      "class": "ok",
+      "errBpm": -1.23
+     },
+     "beats_hint@128": {
+      "bpm": 198.77,
+      "class": "ok",
+      "errBpm": -1.23,
+      "firstBeatSec": 0.354,
+      "beats": 55
+     },
+     "seconds@128": 0.51
+    }
+   },
+   {
+    "bars": 16,
+    "startSec": 135.0,
+    "lenSec": 19.2,
+    "est": {
+     "default@512": {
+      "bpm": 99.38,
+      "class": "half",
+      "errBpm": -100.62
+     },
+     "hint@512": {
+      "bpm": 198.77,
+      "class": "ok",
+      "errBpm": -1.23
+     },
+     "genre_prior@512": {
+      "bpm": 198.77,
+      "class": "ok",
+      "errBpm": -1.23
+     },
+     "beats_hint@512": {
+      "bpm": 198.77,
+      "class": "ok",
+      "errBpm": -1.23,
+      "firstBeatSec": 17.438,
+      "beats": 6
+     },
+     "seconds@512": 0.04,
+     "default@128": {
+      "bpm": 100.35,
+      "class": "half",
+      "errBpm": -99.65
+     },
+     "hint@128": {
+      "bpm": 198.77,
+      "class": "ok",
+      "errBpm": -1.23
+     },
+     "genre_prior@128": {
+      "bpm": 198.77,
+      "class": "ok",
+      "errBpm": -1.23
+     },
+     "beats_hint@128": {
+      "bpm": 198.77,
+      "class": "ok",
+      "errBpm": -1.23,
+      "firstBeatSec": 17.432,
+      "beats": 6
+     },
+     "seconds@128": 0.52
+    }
+   }
+  ]
+ },
+ {
+  "title": "It Will Be OK",
+  "truthBpm": 160.0,
+  "durationSec": 213.6,
+  "loadSec": 0.34,
+  "full": {
+   "default@512": {
+    "bpm": 161.5,
+    "class": "ok",
+    "errBpm": 1.5
+   },
+   "hint@512": {
+    "bpm": 161.5,
+    "class": "ok",
+    "errBpm": 1.5
+   },
+   "genre_prior@512": {
+    "bpm": 161.5,
+    "class": "ok",
+    "errBpm": 1.5
+   },
+   "beats_hint@512": {
+    "bpm": 161.5,
+    "class": "ok",
+    "errBpm": 1.5,
+    "firstBeatSec": 2.717,
+    "beats": 534
+   },
+   "seconds@512": 0.41,
+   "default@128": {
+    "bpm": 159.01,
+    "class": "ok",
+    "errBpm": -0.99
+   },
+   "hint@128": {
+    "bpm": 161.5,
+    "class": "ok",
+    "errBpm": 1.5
+   },
+   "genre_prior@128": {
+    "bpm": 161.5,
+    "class": "ok",
+    "errBpm": 1.5
+   },
+   "beats_hint@128": {
+    "bpm": 161.5,
+    "class": "ok",
+    "errBpm": 1.5,
+    "firstBeatSec": 2.705,
+    "beats": 542
+   },
+   "seconds@128": 5.64
+  },
+  "segments": [
+   {
+    "bars": 4,
+    "startSec": 53.4,
+    "lenSec": 6.0,
+    "est": {
+     "default@512": {
+      "bpm": 107.67,
+      "class": "2/3",
+      "errBpm": -52.33
+     },
+     "hint@512": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5
+     },
+     "genre_prior@512": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5
+     },
+     "beats_hint@512": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5,
+      "firstBeatSec": 0.325,
+      "beats": 15
+     },
+     "seconds@512": 0.02,
+     "default@128": {
+      "bpm": 107.67,
+      "class": "2/3",
+      "errBpm": -52.33
+     },
+     "hint@128": {
+      "bpm": 159.01,
+      "class": "ok",
+      "errBpm": -0.99
+     },
+     "genre_prior@128": {
+      "bpm": 159.01,
+      "class": "ok",
+      "errBpm": -0.99
+     },
+     "beats_hint@128": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5,
+      "firstBeatSec": 0.308,
+      "beats": 15
+     },
+     "seconds@128": 0.19
+    }
+   },
+   {
+    "bars": 4,
+    "startSec": 106.8,
+    "lenSec": 6.0,
+    "est": {
+     "default@512": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5
+     },
+     "hint@512": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5
+     },
+     "genre_prior@512": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5
+     },
+     "beats_hint@512": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5,
+      "firstBeatSec": 0.348,
+      "beats": 7
+     },
+     "seconds@512": 0.01,
+     "default@128": {
+      "bpm": 159.01,
+      "class": "ok",
+      "errBpm": -0.99
+     },
+     "hint@128": {
+      "bpm": 159.01,
+      "class": "ok",
+      "errBpm": -0.99
+     },
+     "genre_prior@128": {
+      "bpm": 159.01,
+      "class": "ok",
+      "errBpm": -0.99
+     },
+     "beats_hint@128": {
+      "bpm": 159.01,
+      "class": "ok",
+      "errBpm": -0.99,
+      "firstBeatSec": 0.325,
+      "beats": 7
+     },
+     "seconds@128": 0.19
+    }
+   },
+   {
+    "bars": 4,
+    "startSec": 160.2,
+    "lenSec": 6.0,
+    "est": {
+     "default@512": {
+      "bpm": 107.67,
+      "class": "2/3",
+      "errBpm": -52.33
+     },
+     "hint@512": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5
+     },
+     "genre_prior@512": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5
+     },
+     "beats_hint@512": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5,
+      "firstBeatSec": 0.395,
+      "beats": 13
+     },
+     "seconds@512": 0.01,
+     "default@128": {
+      "bpm": 106.56,
+      "class": "2/3",
+      "errBpm": -53.44
+     },
+     "hint@128": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5
+     },
+     "genre_prior@128": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5
+     },
+     "beats_hint@128": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5,
+      "firstBeatSec": 0.377,
+      "beats": 13
+     },
+     "seconds@128": 0.19
+    }
+   },
+   {
+    "bars": 16,
+    "startSec": 53.4,
+    "lenSec": 24.0,
+    "est": {
+     "default@512": {
+      "bpm": 107.67,
+      "class": "2/3",
+      "errBpm": -52.33
+     },
+     "hint@512": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5
+     },
+     "genre_prior@512": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5
+     },
+     "beats_hint@512": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5,
+      "firstBeatSec": 0.325,
+      "beats": 64
+     },
+     "seconds@512": 0.09,
+     "default@128": {
+      "bpm": 106.56,
+      "class": "2/3",
+      "errBpm": -53.44
+     },
+     "hint@128": {
+      "bpm": 159.01,
+      "class": "ok",
+      "errBpm": -0.99
+     },
+     "genre_prior@128": {
+      "bpm": 159.01,
+      "class": "ok",
+      "errBpm": -0.99
+     },
+     "beats_hint@128": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5,
+      "firstBeatSec": 0.308,
+      "beats": 62
+     },
+     "seconds@128": 0.68
+    }
+   },
+   {
+    "bars": 16,
+    "startSec": 106.8,
+    "lenSec": 24.0,
+    "est": {
+     "default@512": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5
+     },
+     "hint@512": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5
+     },
+     "genre_prior@512": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5
+     },
+     "beats_hint@512": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5,
+      "firstBeatSec": 0.348,
+      "beats": 55
+     },
+     "seconds@512": 0.08,
+     "default@128": {
+      "bpm": 159.01,
+      "class": "ok",
+      "errBpm": -0.99
+     },
+     "hint@128": {
+      "bpm": 159.01,
+      "class": "ok",
+      "errBpm": -0.99
+     },
+     "genre_prior@128": {
+      "bpm": 159.01,
+      "class": "ok",
+      "errBpm": -0.99
+     },
+     "beats_hint@128": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5,
+      "firstBeatSec": 0.325,
+      "beats": 52
+     },
+     "seconds@128": 0.71
+    }
+   },
+   {
+    "bars": 16,
+    "startSec": 160.2,
+    "lenSec": 24.0,
+    "est": {
+     "default@512": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5
+     },
+     "hint@512": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5
+     },
+     "genre_prior@512": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5
+     },
+     "beats_hint@512": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5,
+      "firstBeatSec": 0.372,
+      "beats": 54
+     },
+     "seconds@512": 0.05,
+     "default@128": {
+      "bpm": 159.01,
+      "class": "ok",
+      "errBpm": -0.99
+     },
+     "hint@128": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5
+     },
+     "genre_prior@128": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5
+     },
+     "beats_hint@128": {
+      "bpm": 161.5,
+      "class": "ok",
+      "errBpm": 1.5,
+      "firstBeatSec": 1.109,
+      "beats": 52
+     },
+     "seconds@128": 0.79
+    }
+   }
+  ]
+ }
+]

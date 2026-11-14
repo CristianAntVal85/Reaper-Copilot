@@ -38,7 +38,7 @@ Dependencias: `core` ← `tools` ← `agent` ← `apps`. Los adaptadores solo de
 
 ## Entorno
 
-Todo corre en WSL: Claude Code, Reaper, Node y Python. Suscripción Claude Pro: los subagentes consumen cuota. Reparto: el hilo principal (modelo más capaz) planifica y orquesta; el subagente `implementer` y los revisores (Sonnet) implementan y validan. Nunca exportes `ANTHROPIC_API_KEY` en el entorno global.
+Claude Code, Node y Python corren en WSL. Reaper es nativo de Windows y alcanza el workspace por `\\wsl.localhost\...`; el adaptador de Reaper traduce las rutas (sección 8.2 del documento maestro). El Reaper para Linux instalado en WSL solo sirve sin interfaz. Suscripción Claude Pro: los subagentes consumen cuota. Reparto: el hilo principal (modelo más capaz) planifica y orquesta; el subagente `implementer` y los revisores (Sonnet) implementan y validan. Nunca exportes `ANTHROPIC_API_KEY` en el entorno global.
 
 ## Idioma
 
