@@ -1,0 +1,545 @@
+# Reaper Copilot
+
+Documento maestro del proyecto (v2.2, 14-nov-2026). Es la fuente de verdad: sustituye a los borradores anteriores.
+
+Lo leen tres públicos:
+
+- **El autor**, como referencia de diseño.
+- **Un reclutador o evaluador**, para entender qué es y cómo está hecho (secciones 1 a 4).
+- **Claude Code**, como prompt inicial del planificador (leer primero la sección 2).
+
+---
+
+## 1. Resumen
+
+Reaper Copilot es un copiloto de IA para el DAW [Reaper](https://www.reaper.fm/). El usuario describe en lenguaje natural lo que quiere hacer con un audio y el sistema lo analiza, lo ejecuta en Reaper y **verifica el resultado con medidas objetivas**.
+
+Ejemplo de petición: *"De esta canción saca un loop de 4 compases, súbelo a 170 BPM y hazlo sonar más distorsionado."*
+
+- **Género objetivo:** techno hardcore, uptempo y hardstyle (150-200 BPM o más).
+- **Naturaleza:** proyecto didáctico y de portfolio, de un solo autor, diseñado para crecer sin deuda técnica.
+- **Idea central:** el valor no está en el chat, sino en la capa de herramientas: análisis de audio, control seguro de Reaper, presets de efectos y verificación medible. El LLM nunca oye audio; razona sobre números.
+
+El producto se entrega en **tres bloques** sobre un mismo núcleo:
+
+| Bloque | Qué es | Quién lo usa | Dónde corre | Coste de IA |
+|---|---|---|---|---|
+| **MCP** | Servidor MCP con las herramientas | El autor, desde Claude Code; otros desarrolladores | PC de desarrollo (WSL) | Suscripción del usuario |
+| **Replay** | Web que reproduce ejecuciones grabadas, con audio antes y después | Reclutadores | Hosting estático | Cero |
+| **Live** | Agente en directo, restringido | Reclutadores con código de invitación | Portátil servidor | API de Claude, con tope |
+
+---
+
+## 2. Instrucciones para Claude Code (planificador)
+
+1. Este documento es de **diseño**. Antes de implementar, produce un plan por fases a partir de la sección 13, con hitos verificables y criterios de salida medibles.
+2. **Empieza por los spikes de la fase 0.** No des por hecho que algo funciona hasta comprobarlo. Lo marcado como *(a comprobar)* no está verificado.
+3. Respeta las **reglas no negociables** de la sección 2.1.
+4. Si algo es ambiguo o falta, añádelo a las preguntas abiertas (sección 15) y pregunta; no decidas en silencio.
+5. Señala dependencias entre tareas, riesgos y qué se puede paralelizar.
+6. Trabaja en incrementos pequeños, cada uno con sus pruebas. El autor está aprendiendo TypeScript, Angular y NestJS: prioriza código claro y explica las decisiones no obvias.
+7. Código, identificadores y commits en inglés. README en inglés y español *(propuesta, pendiente de confirmar)*.
+
+### 2.1 Reglas no negociables
+
+- **Núcleo sin dependencias externas.** `libs/core` no importa NestJS, Angular, Reaper, Python ni SDKs de terceros.
+- **Herramientas definidas una sola vez** en `libs/tools`, y reutilizadas por el servidor MCP y por el agente del modo Live.
+- **Solo herramientas MCP estándar (tools).** No depender de prompts, elicitación, tareas ni sampling del protocolo.
+- **Conjunto cerrado de comandos hacia Reaper.** No existe ninguna herramienta que ejecute código arbitrario (Lua, shell).
+- **No destructivo.** Los archivos originales no se modifican. Cada comando que cambia el proyecto va en un bloque de deshacer de Reaper.
+- **Rutas restringidas al workspace.** Toda ruta recibida se valida.
+- **La verificación es código**, no opinión del LLM.
+- **El LLM recibe resúmenes compactos en JSON**, nunca audio ni arrays de muestras.
+- **Contratos tipados con zod** en cada frontera (Python, Reaper, LLM, HTTP).
+- **Sin API de Claude en las fases 0 a 3.** La clave de API solo existe en el servidor del modo Live, en su `.env`. Nunca exportar `ANTHROPIC_API_KEY` en el entorno global: haría que Claude Code facturase por API en vez de usar la suscripción.
+- **Evitar dependencias con licencia AGPL** (por ejemplo Essentia).
+
+---
+
+## 3. Usuarios y escenarios
+
+1. **El autor.** Usa el servidor MCP desde Claude Code en WSL (terminal y extensión de VS Code) con su suscripción Pro. Quiere aprender producción y producir sus propios temas.
+2. **Reclutadores y evaluadores.** Tienen pocos minutos, probablemente ningún cliente MCP y ninguna suscripción de IA. Necesitan verlo funcionar desde una URL, sin instalar nada.
+3. **Desarrolladores.** Llegan por GitHub y quieren conectar el servidor a su propio cliente MCP.
+
+---
+
+## 4. Los tres bloques
+
+### 4.1 Bloque MCP (producto central)
+
+- Servidor MCP por **stdio** que expone las herramientas de la sección 7.
+- Cada usuario aporta su cliente y su suscripción: el proyecto no gestiona claves ni costes.
+- **Compatibilidad probada:** Claude Code en terminal y en la extensión de VS Code, ambos en WSL. Otros clientes (Claude Desktop, Cursor, etc.) deberían funcionar al usar solo herramientas estándar, pero no están probados y no se prometen.
+- **Modos**, por variable de entorno `MODE`:
+  - `mentor`: solo se exponen las herramientas de lectura. El LLM analiza y explica, no toca nada.
+  - `agent`: se exponen todas.
+- Instalación para terceros: `claude mcp add` y un `.mcp.json` en el repositorio *(a comprobar)*.
+
+### 4.2 Bloque Replay (portfolio, siempre disponible)
+
+- Aplicación Angular compilada como **sitio estático**.
+- Reproduce **ejecuciones grabadas**: la petición, los pasos (llamadas a herramientas), los criterios y su resultado, con reproductores de audio antes y después, forma de onda y espectro.
+- No es un vídeo: es una página interactiva alimentada por archivos JSON y de audio exportados desde las trazas reales (sección 9). Un vídeo corto en el README la complementa.
+- Sin backend, sin API, sin Reaper. Coste cero.
+- Muestra un indicador "demo en vivo disponible / no disponible" consultando el estado del servidor Live.
+- **Audio público:** solo material propio o con licencia que permita publicarlo. No usar fragmentos de canciones comerciales en la demo.
+
+### 4.3 Bloque Live (portfolio, restringido)
+
+- Un agente propio (bucle con la API de Claude) que usa las mismas herramientas sobre un Reaper real en el portátil servidor.
+- Restricciones:
+  - **Código de invitación** que entrega el autor.
+  - **Solo muestras preinstaladas.** Sin subida de archivos.
+  - **Una ejecución a la vez** (cola), porque Reaper es de una sola instancia.
+  - Límite de iteraciones, de tiempo y de peticiones por visitante.
+  - **Tope de gasto mensual** en la consola de Anthropic y modelo económico.
+- Si el portátil está apagado, el portfolio sigue funcionando con el Replay.
+
+---
+
+## 5. Alcance
+
+### 5.1 MVP: "el loop a 170"
+
+1. Analizar un archivo: BPM (con alternativas mitad y doble), tonalidad, LUFS, bandas de frecuencia y factor de cresta.
+2. Importarlo a Reaper y cortar un loop por compases.
+3. Time-stretch al BPM objetivo.
+4. Aplicar una cadena de efectos desde presets (distorsión, EQ, limitador) con plugins de serie.
+5. Renderizar, reanalizar y comparar con los criterios (verificación).
+6. Modos mentor y agente.
+
+### 5.2 Fuera del MVP
+
+Separación de stems, composición MIDI, mezcla y master completos, RAG, varios usuarios simultáneos, LLM local, plugins de terceros.
+
+### 5.3 Después
+
+Comparación con pista de referencia, patrones MIDI de hardstyle, búsqueda en la documentación de Reaper (sección 5.4), recetas por género sobre la misma infraestructura, experimento con un LLM local (Ollama), soporte probado de otros clientes MCP.
+
+### 5.4 Ampliación prevista: búsqueda en la documentación de Reaper (RAG)
+
+Objetivo: que el usuario pregunte cómo se hace algo en Reaper y reciba una respuesta apoyada en la documentación, con cita. Refuerza el modo mentor y ayuda al propio desarrollo (referencia de ReaScript para escribir `bridge.lua`).
+
+- **Solo se construye la recuperación.** La respuesta la genera el LLM del cliente (Claude Code) o el agente Live. No añade coste de API.
+- **Herramienta nueva de lectura:** `search_reaper_docs(query, topK)` devuelve fragmentos con su fuente (documento, sección, página).
+- **Puerto nuevo:** `KnowledgePort`, con un adaptador propio. No modifica el resto de la arquitectura.
+- **Ingesta:** script que trocea la guía de usuario de Reaper y la referencia de ReaScript en fragmentos con metadatos.
+- **Índice:** embeddings con un modelo pequeño ejecutado en local (CPU) y almacenamiento en SQLite con extensión vectorial *(modelo y extensión a comprobar)*. Búsqueda híbrida: palabras clave (FTS de SQLite) más vectorial.
+- **Idioma:** la documentación está en inglés; el LLM formula la consulta en inglés y responde en el idioma del usuario.
+- **Evaluación:** conjunto de preguntas con el fragmento esperado; medir si aparece entre los primeros resultados, comparando solo palabras clave, solo vectores e híbrido.
+- **Derechos:** la documentación tiene copyright. El repositorio incluye solo el script de ingesta; cada usuario indexa su propia copia. Ni el texto ni el índice se publican en el repositorio ni en la demo pública sin revisar antes la licencia.
+- **Fuera del MVP:** fase 5, o miniproyecto en paralelo que no bloquea las fases 1 a 4.
+
+---
+
+## 6. Arquitectura
+
+### 6.1 Principios
+
+Arquitectura hexagonal (puertos y adaptadores). El núcleo define **puertos** (interfaces) y todo lo externo se conecta con **adaptadores**. Hay dos **entradas** al mismo núcleo: el servidor MCP y la API del modo Live. Cambiar de DAW, de LLM o de almacenamiento es escribir un adaptador nuevo.
+
+### 6.2 Capas
+
+```mermaid
+flowchart TD
+    CC["Claude Code<br/>(terminal / VS Code)"] --> MCP["apps/mcp-server<br/>entrada MCP stdio"]
+    WEB["apps/web (Angular)<br/>Replay + Live"] --> API["apps/api (NestJS)<br/>entrada HTTP/WebSocket"]
+    API --> AGENT["libs/agent<br/>bucle del agente (solo Live)"]
+    MCP --> TOOLS["libs/tools<br/>registro de herramientas (zod)"]
+    AGENT --> TOOLS
+    TOOLS --> CORE["libs/core<br/>dominio, tareas, puertos"]
+    CORE --> P1["DawPort"]
+    CORE --> P2["AnalyzerPort"]
+    CORE --> P3["StoragePort"]
+    AGENT --> P4["LlmPort"]
+    P1 --> A1["Reaper<br/>bridge.lua, IPC por archivos"]
+    P2 --> A2["Python<br/>librosa, pyloudnorm"]
+    P3 --> A3["SQLite + disco"]
+    P4 --> A4["API de Claude"]
+```
+
+### 6.3 Estructura del monorepo (Nx)
+
+```
+reaper-copilot/
+├─ apps/
+│  ├─ mcp-server/      entrada MCP (stdio). Bloque MCP
+│  ├─ api/             NestJS: agente Live, cola, salud, trazas
+│  └─ web/             Angular: Replay (estático) y Live
+├─ libs/
+│  ├─ core/            dominio puro: tipos, puertos, Task, errores
+│  ├─ tools/           definiciones (zod) y handlers de herramientas
+│  ├─ agent/           bucle del agente para Live
+│  ├─ adapters/
+│  │  ├─ reaper/         DawPort sobre IPC por archivos
+│  │  ├─ analysis-py/    AnalyzerPort (proceso hijo de Python)
+│  │  ├─ llm-anthropic/  LlmPort
+│  │  └─ storage-sqlite/ StoragePort
+│  └─ testing/         FakeDaw, FakeAnalyzer, FakeLlm
+├─ python/analysis/    paquete Python + CLI + tests
+├─ reaper/
+│  ├─ bridge/          bridge.lua
+│  └─ presets/         cadenas de FX en JSON
+├─ evals/              peticiones doradas y criterios
+├─ deploy/             systemd, túnel, scripts del servidor
+└─ docs/
+```
+
+**Regla de dependencias:** `core` ← `tools` ← `agent` ← `apps`. Los adaptadores solo dependen de `core`. Las `apps` cablean puertos y adaptadores.
+
+### 6.4 Puertos
+
+```ts
+interface DawPort {
+  getProjectState(): Promise<ProjectState>;
+  setTempo(bpm: number): Promise<void>;
+  importAudio(path: AssetPath): Promise<ItemRef>;
+  sliceByBars(item: ItemRef, startBar: number, bars: number): Promise<ItemRef>;
+  stretchToTempo(item: ItemRef, targetBpm: number): Promise<ItemRef>;
+  applyFxChain(track: TrackRef, preset: PresetId, params?: Record<string, number>): Promise<void>;
+  render(opts: RenderOpts): Promise<JobId>;
+  undo(steps: number): Promise<void>;
+}
+
+interface AnalyzerPort {
+  analyze(path: AssetPath): Promise<AudioFeatures>;
+  compare(a: AssetPath, b: AssetPath): Promise<FeatureDiff>;
+}
+
+interface StoragePort { /* tareas, trazas, trabajos, caché de análisis, assets */ }
+
+interface LlmPort { runTurn(input: TurnInput): AsyncIterable<LlmEvent>; } // solo Live
+```
+
+Son un punto de partida; el planificador puede ajustarlos.
+
+---
+
+## 7. Herramientas
+
+Conjunto cerrado. Pocas, de alto nivel y con descripciones claras.
+
+| Herramienta | Riesgo | Descripción |
+|---|---|---|
+| `analyze_audio` | lectura | Analiza un archivo y devuelve JSON compacto. Caché por sha256 |
+| `compare_audio` | lectura | Diferencias entre dos análisis |
+| `get_project_state` | lectura | Pistas, items y tempo del proyecto |
+| `list_presets` | lectura | Presets de FX con sus parámetros y rangos |
+| `get_job_status` | lectura | Estado de un render o análisis largo |
+| `verify_task` | lectura | Mide el render y devuelve el resultado por criterio (sección 9.2). No acepta criterios |
+| `start_task` | modifica (ligero) | Registra la petición literal, el audio de origen, el objetivo y los criterios (sección 9.2) |
+| `import_audio` | modifica | Importa desde el workspace; el original no se toca |
+| `set_tempo` | modifica | Cambia el tempo del proyecto |
+| `slice_loop` | modifica | Corta un loop por compases |
+| `time_stretch` | modifica | Estira al BPM objetivo |
+| `apply_fx_chain` | modifica | Aplica un preset con parámetros dentro de rango |
+| `render_selection` | modifica | Asíncrono: devuelve `jobId` |
+| `undo_last` | modifica | Deshace el último bloque |
+
+En modo `mentor` solo se exponen las de lectura.
+
+**Presets de FX como datos.** Las cadenas (por ejemplo `distortion_hard`, `kick_punch`) son JSON versionado en `reaper/presets/`, con plugins de serie de Reaper (ReaEQ, ReaComp, ReaPitch, ReaSamplOmatic5000, efectos JS de distorsión y limitador), parámetros y rangos permitidos.
+
+---
+
+## 8. Contratos externos
+
+### 8.1 TypeScript con Python
+
+- CLI: `python -m analysis analyze <ruta>` y `python -m analysis compare <a> <b>`.
+- Salida JSON por stdout; errores por stderr con código de salida distinto de cero.
+
+```json
+{
+  "schemaVersion": 1,
+  "file": { "sha256": "…", "durationSec": 12.4, "sampleRate": 44100, "channels": 2 },
+  "tempo": { "bpm": 128.0, "confidence": 0.82, "alternatives": [64.0, 256.0] },
+  "key": { "tonic": "A", "mode": "minor", "confidence": 0.61 },
+  "loudness": { "integratedLufs": -9.3, "peakDb": -0.4 },
+  "bands": { "sub": -18.2, "bass": -12.1, "lowMid": -14.0, "mid": -15.3, "highMid": -17.8, "high": -22.5 },
+  "dynamics": { "crestFactorDb": 7.9 }
+}
+```
+
+- El esquema vive en zod; hay tests de contrato contra la salida real de Python.
+- La detección de BPM es menos fiable por encima de ~200 BPM y puede dar el doble o la mitad: se devuelven siempre alternativas y, si existe, se usa el tempo objetivo como pista.
+
+### 8.2 TypeScript con Reaper
+
+- Un script `bridge.lua` corre dentro de Reaper y sondea con `reaper.defer`.
+- IPC por archivos en el workspace: `inbox/` (peticiones) y `outbox/` (respuestas), con escritura atómica (archivo temporal y renombrado).
+- Petición: `{ id, method, params, schemaVersion }`. Respuesta: `{ id, ok, result | error }`.
+- Lista cerrada de métodos, validados a ambos lados. Cada método mutante se envuelve en un bloque de deshacer.
+- Un solo cliente a la vez (archivo de bloqueo).
+- Tanto en desarrollo (WSL) como en el servidor (Ubuntu), Reaper y el backend comparten sistema de archivos: no hay traducción de rutas.
+
+---
+
+## 9. Tareas, verificación y trazas
+
+### 9.1 Flujo
+
+```mermaid
+sequenceDiagram
+    participant U as Usuario
+    participant L as LLM (Claude Code o agente Live)
+    participant T as Herramientas
+    participant R as Reaper
+    participant P as Python
+    U->>L: "Loop de 4 compases a 170 BPM, más distorsión"
+    L->>T: analyze_audio
+    T->>P: analizar
+    P-->>L: BPM, tonalidad, LUFS, bandas
+    L->>T: start_task (objetivo + criterios)
+    L->>T: import_audio, slice_loop, time_stretch, apply_fx_chain
+    T->>R: comandos (bloques de deshacer)
+    L->>T: render_selection → jobId
+    L->>T: get_job_status
+    L->>T: verify_task
+    T->>P: analizar el render
+    T-->>L: cumple / no cumple por criterio
+    L-->>U: resultado y explicación
+```
+
+Si un criterio no se cumple y quedan iteraciones, el LLM ajusta parámetros y repite.
+
+### 9.2 Criterios
+
+Un criterio es un dato, no texto libre. El esquema vive en zod en `libs/core` y es un punto de partida; el planificador puede ajustarlo.
+
+**Entrada de `start_task`:**
+
+```json
+{
+  "request": "Loop de 4 compases a 170 BPM, más distorsionado",
+  "source": "samples/break.wav",
+  "target": { "bpm": 170, "bars": 4, "beatsPerBar": 4 },
+  "criteria": [
+    { "id": "louder", "metric": "loudness.integratedLufs", "basis": "absolute", "min": -9, "max": -6 },
+    { "id": "more-distortion", "metric": "dynamics.crestFactorDb", "basis": "delta", "max": -3 }
+  ]
+}
+```
+
+**Criterio:** `{ id, metric, basis, min?, max? }`.
+
+- `metric`: lista cerrada, con las rutas numéricas del análisis (sección 8.1): `file.durationSec`, `tempo.bpm`, `loudness.integratedLufs`, `loudness.peakDb`, `bands.*`, `dynamics.crestFactorDb`. Una métrica nueva exige ampliar primero el análisis.
+- `basis`: `absolute` compara el valor del render; `delta` compara render menos origen, en las unidades de la métrica. "Más" o "menos" de algo es siempre `delta`.
+- `min` y `max`: límites inclusivos; al menos uno. Un objetivo con tolerancia se expresa con los dos.
+
+**Reglas que aplica el servidor, no el LLM:**
+
+1. Al menos un criterio, con `id` únicos.
+2. **Los criterios se fijan en `start_task`.** `verify_task` no acepta criterios: cambiarlos exige una tarea nueva, que queda en la traza. El LLM no puede mover la meta después de ver el resultado.
+3. **Un criterio `delta` debe excluir el cero** (`min > 0` o `max < 0`): no puede cumplirse sin cambiar nada.
+4. **Criterios obligatorios derivados de `target`**, que el LLM no puede quitar:
+   - Con `bpm` y `bars`: duración del render igual a `bars × beatsPerBar × 60 / bpm` con ±20 ms (4 compases a 170 BPM son 5,647 s). Es la comprobación principal del tempo, porque es determinista.
+   - Con `bpm`: `tempo.bpm` dentro de ±1, analizado con el objetivo como pista. Si la detección no es fiable, el resultado es `unmeasured`, no `fail`.
+
+**Salida de `verify_task`:**
+
+```json
+{
+  "taskId": "…",
+  "pass": false,
+  "results": [
+    { "id": "duration", "derived": true, "status": "pass", "measured": 5.646, "min": 5.627, "max": 5.667 },
+    { "id": "more-distortion", "status": "fail", "measured": -1.8, "sourceValue": 9.7, "renderValue": 7.9, "max": -3 }
+  ]
+}
+```
+
+- `status`: `pass`, `fail` o `unmeasured`. `pass` global exige que ninguno sea `fail` y que los derivados de duración sean `pass`.
+- El resultado incluye siempre el valor medido, para que el LLM ajuste parámetros con números y el Replay los muestre.
+
+### 9.3 Trazas y exportación para el Replay
+
+- Cada llamada a herramienta se guarda en SQLite: tarea, paso, argumentos, resultado, duración y marca de tiempo.
+- Un comando `export-replay` genera, por cada ejecución elegida, una carpeta con `run.json` (petición, pasos, criterios, resultados, análisis) y los audios antes y después en formato comprimido.
+- El sitio Replay solo lee esos archivos. Así el Replay muestra ejecuciones reales, no maquetas.
+
+---
+
+## 10. Alojamiento y entornos
+
+```mermaid
+flowchart LR
+    subgraph DEV["PC de desarrollo (Windows + WSL)"]
+        CC["Claude Code<br/>(suscripción Pro)"] --> MCPS["Servidor MCP"]
+        MCPS --> RD["Reaper"]
+        MCPS --> PD["Python"]
+    end
+    subgraph HOST["Hosting estático"]
+        REP["Sitio Replay<br/>Angular + JSON + audio"]
+    end
+    subgraph SRV["Portátil servidor (Ubuntu)"]
+        TUN["Túnel saliente"] --> APIS["API NestJS + agente"]
+        APIS --> RS["Reaper sin pantalla"]
+        APIS --> PS["Python"]
+        APIS --> DB["SQLite"]
+    end
+    DEV -- "export-replay + build" --> HOST
+    VIS["Reclutador"] --> REP
+    REP -- "estado y modo Live" --> TUN
+    APIS --> ANT["API de Claude"]
+```
+
+| Entorno | Equipo | Qué corre | Para qué |
+|---|---|---|---|
+| **Desarrollo** | PC del autor: Ryzen AI 7, 32 GB RAM, Windows con WSL | Claude Code, VS Code, servidor MCP, Reaper, Python, todo en WSL | Desarrollar, usar el bloque MCP, grabar ejecuciones para el Replay |
+| **Hosting estático** | Servicio gratuito (GitHub Pages o Cloudflare Pages) *(a comprobar)* | Sitio Replay | Portfolio siempre disponible |
+| **Servidor Live** | Portátil viejo: Intel i3, 8 GB RAM, 256 GB, Ubuntu | API NestJS, agente, Reaper sin pantalla, Python, SQLite, túnel | Demo en vivo |
+| **Externos** | Anthropic, GitHub | API de Claude (solo Live), repositorio | — |
+
+Notas:
+
+- El frontend del modo Live es la misma aplicación Angular del hosting estático; llama a la API del portátil a través del túnel (CORS limitado al dominio del sitio).
+- El portátil basta para **una ejecución a la vez**: el LLM corre en la nube y el equipo solo ejecuta Reaper, el análisis y la API.
+
+---
+
+## 11. Preparación del portátil servidor
+
+Lista de trabajo. Los comandos concretos se validan en la fase 4.
+
+### 11.1 Sistema
+
+- Ubuntu LTS actualizado; instalación mínima sin escritorio si es posible.
+- Actualizaciones automáticas de seguridad (`unattended-upgrades`).
+- Acceso por SSH solo con clave, sin contraseña ni login de root.
+- Firewall (`ufw`): denegar todo lo entrante salvo SSH desde la red local.
+
+### 11.2 Siempre encendido
+
+- Desactivar suspensión e hibernación (`systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target`).
+- Que cerrar la tapa no lo duerma: `HandleLidSwitch=ignore` en `/etc/systemd/logind.conf`.
+- **Batería:** revisar su estado; enchufada permanentemente, una batería vieja puede degradarse o hincharse. Limitar la carga si el equipo lo permite, o retirarla.
+- Ventilación despejada; comprobar temperaturas bajo carga.
+
+### 11.3 Aplicación
+
+- Usuario de sistema sin privilegios (por ejemplo `copilot`) dueño del workspace.
+- Dependencias: Node LTS, Python 3.11+ con entorno virtual, ffmpeg, Reaper para Linux.
+- **Reaper sin pantalla:** arrancarlo sobre una pantalla virtual (Xvfb) con `bridge.lua` cargado al inicio *(a comprobar; es un spike)*. El render no necesita dispositivo de audio.
+- **Licencia de Reaper:** revisar las condiciones para una demo pública antes de desplegar.
+- Servicios `systemd` con `Restart=always` para: pantalla virtual + Reaper, API NestJS y túnel. Arranque automático al encender.
+- Variables en un `.env` con permisos restringidos: clave de API, códigos de invitación, límites.
+
+### 11.4 Exposición a internet
+
+- **No abrir puertos en el router.** Usar un túnel saliente (Cloudflare Tunnel o Tailscale Funnel) *(a comprobar)*, que además aporta HTTPS.
+- Si el router lo permite, conectar el portátil a una red de invitados, aislada del resto de equipos de casa.
+- Endpoint `/health` para el indicador del Replay y para monitorización.
+
+### 11.5 Operación
+
+- Rotación de logs y limpieza periódica de renders antiguos.
+- Copia de seguridad de la base SQLite.
+- Aviso al autor si el servicio cae o si el gasto se acerca al tope *(opcional)*.
+
+---
+
+## 12. Seguridad y costes
+
+### 12.1 Seguridad
+
+- Las restricciones viven **en el servidor de herramientas**, no en el cliente: Claude Code es un agente con herramientas propias de archivos y shell.
+- Validación de rutas, lista cerrada de comandos, originales de solo lectura, bloques de deshacer.
+- Entradas externas (nombres de archivo, metadatos, texto del visitante) tratadas como datos, no como instrucciones.
+- En Live: sin subida de archivos, código de invitación, límites por visitante, límite de iteraciones y de tiempo por ejecución, cola de una ejecución.
+- La clave de API nunca llega al navegador ni al repositorio.
+
+### 12.2 Costes
+
+| Concepto | Coste |
+|---|---|
+| Bloque MCP | Incluido en la suscripción Claude Pro del autor (comparte límite de uso con el resto de su actividad en Claude) |
+| Replay | Cero (hosting estático gratuito) |
+| Live | API de Claude por token; tope mensual en la consola de Anthropic; modelo económico; caché de prompt |
+| Portátil | Electricidad de un equipo en reposo |
+| Reaper | Licencia, según condiciones *(a comprobar)* |
+
+---
+
+## 13. Hoja de ruta
+
+| Fase | Contenido | Criterio de salida |
+|---|---|---|
+| **0. Spikes** | (1) Reaper en WSL ejecuta `bridge.lua` y responde por IPC. (2) librosa sobre samples de 170-200 BPM, comprobando doble y mitad. (3) Servidor MCP mínimo con una herramienta, probado en Claude Code en terminal y en la extensión de VS Code, incluido el flujo de aprobación | Los tres funcionan o hay alternativa documentada |
+| **0b. Andamiaje** | Repositorio git y `.gitignore`; monorepo Nx con pnpm; `libs/core` vacía con una prueba; `pnpm check` y `pnpm check:full`; paquete Python con `pytest`; CI ajustado | `pnpm check` y `pnpm check:full` en verde en local y el CI en verde en una pull request |
+| **1. MCP con análisis** | `core`, `tools`, adaptador de Python, `analyze_audio`, `compare_audio`, SQLite con trazas, fakes | Pedir un análisis desde Claude Code y recibir JSON validado |
+| **2. MCP con Reaper** | Adaptador de Reaper, herramientas que modifican, presets, render asíncrono, `start_task`, `verify_task`, modos | El caso "loop a 170" de punta a punta desde Claude Code, verificado con criterios |
+| **3. Replay** | `export-replay`, aplicación Angular con reproductor, forma de onda, espectro y pasos; despliegue estático | URL pública con al menos tres ejecuciones reales |
+| **4. Live** | Spike de Reaper sin pantalla en el portátil; `LlmPort`, bucle del agente, API NestJS, cola, invitaciones, límites; preparación del servidor y túnel | Ejecución en vivo desde la web con código de invitación y tope de gasto activo |
+| **5. Ampliaciones** | Búsqueda en la documentación de Reaper (sección 5.4), recetas por género, comparación con referencia, MIDI, stems, LLM local, otros clientes | Para la búsqueda en documentación: preguntar desde Claude Code y recibir respuesta con cita; evaluación de recuperación medida. Resto por definir |
+
+El spike de Reaper sin pantalla puede adelantarse a la fase 0 si el portátil está disponible: es el mayor riesgo del bloque Live.
+
+---
+
+## 14. Stack, pruebas y evals
+
+### 14.1 Stack
+
+- **TypeScript 5+**, Node LTS (20 o superior), monorepo **Nx**.
+- **MCP:** `@modelcontextprotocol/sdk`. **Validación:** zod 3.25+.
+- **Backend Live:** NestJS. **Frontend:** Angular.
+- **LLM (solo Live):** `@anthropic-ai/sdk`. Su `toolRunner` está en beta; alternativa: un bucle propio detrás de `LlmPort`.
+- **Python 3.11+:** librosa, pyloudnorm, numpy, scipy, soundfile.
+- **Reaper** para Linux con puente en Lua y plugins de serie. **ffmpeg**. **SQLite**.
+
+### 14.2 Pruebas
+
+- Unitarias con fakes (`FakeDaw`, `FakeAnalyzer`, `FakeLlm`): no requieren Reaper ni API.
+- De contrato: salida real de Python contra los esquemas zod; mensajes del puente de Reaper.
+- De integración con Reaper real: opcionales y etiquetadas.
+
+### 14.3 Evals
+
+- 10 a 15 peticiones doradas con criterios medibles (por ejemplo: "sube a 170 BPM", "más distorsión sin pasar de −6 LUFS").
+- Miden tasa de éxito, número de pasos y, en Live, coste.
+- Las descripciones de las herramientas se validan en la terminal y en la extensión de VS Code.
+
+---
+
+## 15. Riesgos y preguntas abiertas
+
+### 15.1 Riesgos
+
+| Riesgo | Mitigación |
+|---|---|
+| Reaper es de una sola instancia: no escala a muchos usuarios | Cola de una ejecución; el Replay no depende de Reaper. Escalar exigiría una instancia por sesión y revisar la licencia |
+| Reaper sin pantalla en el portátil no funciona como se espera | Spike temprano; plan B: sesión gráfica mínima |
+| BPM poco fiable por encima de ~200 | Alternativas mitad y doble; tempo objetivo como pista |
+| El portátil o la conexión de casa se caen | El Replay vive en hosting estático; indicador de disponibilidad |
+| Abuso o gasto en Live | Invitación, límites, tope mensual, sin subida de archivos |
+| Funciones MCP avanzadas no disponibles en todas las superficies | Usar solo herramientas estándar |
+| `toolRunner` en beta | Bucle propio detrás de `LlmPort` |
+
+### 15.2 Preguntas abiertas
+
+1. Servicio de hosting estático y de túnel definitivos.
+2. Condiciones de licencia de Reaper para la demo pública.
+3. Empaquetado de Python junto al servidor MCP para terceros.
+4. Idioma del README y de la interfaz del Replay.
+5. Qué muestras preinstaladas usar en Live y Replay (propias o con licencia libre).
+6. Modelo de Claude para el modo Live y límites concretos por visitante.
+7. Nombres y parámetros finales de los presets de FX para hardstyle y hardcore.
+8. Licencia de la documentación de Reaper: si permite ofrecer la búsqueda en el modo Live público.
+9. Modelo de embeddings local y extensión vectorial de SQLite para la búsqueda en documentación.
+10. Tolerancias por defecto de los criterios derivados (±20 ms de duración, ±1 BPM) y umbral de confianza para `unmeasured`: ajustar con los resultados del spike de librosa.
+
+---
+
+## 16. Glosario
+
+- **DAW:** estación de trabajo de audio digital (Reaper).
+- **MCP:** Model Context Protocol; estándar para exponer herramientas a un LLM.
+- **LUFS:** medida de sonoridad percibida.
+- **Factor de cresta:** diferencia entre pico y nivel medio; baja con distorsión y compresión.
+- **Time-stretch:** cambiar el tempo de un audio sin cambiar su tono.
+- **Puerto / adaptador:** interfaz del núcleo y su implementación concreta.
+- **Traza:** registro de los pasos de una ejecución.
+- **RAG:** generación aumentada por recuperación; buscar fragmentos relevantes en una base de documentos y dárselos al LLM para que responda con ellos.
+- **Embedding:** vector numérico que representa el significado de un texto y permite buscar por similitud.

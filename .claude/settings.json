@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm check)",
+      "Bash(pnpm check:full)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./**/.env)",
+      "Read(./**/.env.*)",
+      "Edit(./.env)",
+      "Edit(./.env.*)",
+      "Edit(./**/.env)",
+      "Edit(./**/.env.*)",
+      "Bash(git add -A*)",
+      "Bash(git add --all*)",
+      "Bash(git add .)",
+      "Bash(git add * -A*)",
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git push * --force*)",
+      "Bash(git push * -f*)",
+      "Bash(export ANTHROPIC_API_KEY*)"
+    ]
+  }
+}

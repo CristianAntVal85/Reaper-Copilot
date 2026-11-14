@@ -1,0 +1,48 @@
+# CI de Reaper Copilot. Plantilla: ajustar cuando exista el monorepo (fase 0).
+# Corre solo en pull requests y en main, no en cada commit de una rama.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Una ejecución nueva cancela la anterior de la misma rama.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  typescript:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check:full
+
+  python:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: python/analysis
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: sudo apt-get update && sudo apt-get install -y libsndfile1 ffmpeg
+      - run: pip install -e ".[dev]"
+      - run: pytest
+
+# Las pruebas con Reaper real (pnpm test:reaper) no corren aquí: solo en local.
