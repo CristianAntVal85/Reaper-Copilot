@@ -5,17 +5,17 @@ Memoria entre sesiones. **Máximo 30 líneas, una idea por línea.** Lo que ya n
 Última actualización: 2026-11-14
 
 ## Dónde estamos
-- Fase en curso: F0-spikes (Reaper y librosa hechos; falta MCP).
-- Rama: `fase/F0-spikes`, sin push.
+- Fase 0 (spikes) terminada: los tres funcionan. Siguiente fase: F0b-andamiaje.
+- Rama: `fase/F0-spikes`, en remoto.
 
 ## Siguiente paso
-- `/spike mcp-minimo`.
-- Tras los tres spikes: `/sdd-plan F0b-andamiaje` (git, Nx, `pnpm check`, CI).
+- `/sdd-plan F0b-andamiaje` (Nx, `pnpm check`, entorno de Python, CI). Antes: pull request de `fase/F0-spikes` a `main`.
 
 ## Hecho
 - Diseño en `docs/reaper-copilot.md` v2.3 (Reaper en Windows con traducción de rutas, sección 8.2).
 - Spike `reaper-bridge-wsl`: el IPC por archivos funciona; la interfaz por WSLg no es usable.
 - Spike `reaper-bridge-windows`: el puente funciona en Reaper de Windows con el IPC en WSL (mediana 32 ms).
+- Spike `mcp-minimo`: funciona en terminal y VS Code con zod 4; el cliente no pidió permiso para ninguna herramienta.
 - Spike `librosa-bpm-alto`: `feature.tempo` no basta; un refinado propio acierta los 6 temas a 0,25 BPM o menos.
 
 ## Pendiente de decidir (usuario)
