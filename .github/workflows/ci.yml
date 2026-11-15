@@ -1,4 +1,4 @@
-# CI de Reaper Copilot. Plantilla: ajustar cuando exista el monorepo (fase 0).
+# CI de Reaper Copilot.
 # Corre solo en pull requests y en main, no en cada commit de una rama.
 name: ci
 
@@ -16,33 +16,36 @@ permissions:
   contents: read
 
 jobs:
-  typescript:
+  check:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm check:full
+      - uses: actions/checkout@v7
 
-  python:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    defaults:
-      run:
-        working-directory: python/analysis
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      # La versión de Node sale de .nvmrc, la misma que usa el desarrollo local.
+      - uses: actions/setup-node@v7
         with:
-          python-version: "3.11"
-          cache: pip
-      - run: sudo apt-get update && sudo apt-get install -y libsndfile1 ffmpeg
-      - run: pip install -e ".[dev]"
-      - run: pytest
+          node-version-file: .nvmrc
+
+      # pnpm llega por Corepack, con la versión que fija "packageManager".
+      # No se usa "cache: pnpm" de setup-node: esa opción ejecuta pnpm al
+      # configurarse, antes de que Corepack lo haya activado. La caché del
+      # almacén se gestiona aquí, después de activar pnpm.
+      - run: corepack enable
+      - id: pnpm-store
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v6
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-store-${{ runner.os }}-
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm py:setup
+      - run: pnpm check:full
 
 # Las pruebas con Reaper real (pnpm test:reaper) no corren aquí: solo en local.
