@@ -5,13 +5,11 @@ Memoria entre sesiones. **Máximo 30 líneas, una idea por línea.** Lo que ya n
 Última actualización: 2026-11-15
 
 ## Dónde estamos
-- Fase F0b-andamiaje implementada (7 de 7 tareas), a falta de validarla.
+- Fase F0b-andamiaje implementada (7 de 7 tareas), revisada (APROBADO) y con las correcciones aplicadas.
 - Rama: `fase/F0b-andamiaje`, sin push.
 
 ## Siguiente paso
-- `/sdd-validate F0b-andamiaje`.
-- Después, pull request a `main`: ahí se comprueba el CI.
-- Después, `/sdd-plan` de la fase 1.
+- Push, pull request a `main` (ahí se comprueba el CI) y fusión; después, `/sdd-plan` de la fase 1.
 
 ## Hecho
 - Fase 0: los tres spikes funcionan (puente de Reaper, MCP mínimo, tempo con librosa). Detalle en `docs/CHANGELOG.md` y `specs/spikes/`.
@@ -22,6 +20,8 @@ Memoria entre sesiones. **Máximo 30 líneas, una idea por línea.** Lo que ya n
 - Idioma del README y de la interfaz del Replay.
 - Muestras de audio para Replay y Live.
 - Hosting estático y túnel definitivos.
+- `pnpm check` falla con un error de git poco claro sin rama local `main`: ¿`origin/main` o mensaje claro?
+- El permiso `Bash(pnpm nx *)` de `.claude/settings.json` es amplio (`nx exec` ejecuta cualquier comando): ¿se estrecha?
 
 ## Hechos que conviene recordar
 - Claude Code, Node y Python en WSL; Reaper de Windows 7.86 para trabajar y de WSL 7.85 solo sin interfaz. No se usa Claude Desktop.

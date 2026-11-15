@@ -431,7 +431,7 @@ Lista de trabajo. Los comandos concretos se validan en la fase 4.
 ### 11.3 Aplicación
 
 - Usuario de sistema sin privilegios (por ejemplo `copilot`) dueño del workspace.
-- Dependencias: Node LTS, Python 3.11+ con entorno virtual, ffmpeg, Reaper para Linux.
+- Dependencias: Node 24, Python 3.11+ con entorno virtual, ffmpeg, Reaper para Linux.
 - **Reaper sin pantalla:** arrancarlo sobre una pantalla virtual (Xvfb) con `bridge.lua` cargado al inicio *(a comprobar; es un spike)*. El render no necesita dispositivo de audio.
 - **Licencia de Reaper:** revisar las condiciones para una demo pública antes de desplegar.
 - Servicios `systemd` con `Restart=always` para: pantalla virtual + Reaper, API NestJS y túnel. Arranque automático al encender.

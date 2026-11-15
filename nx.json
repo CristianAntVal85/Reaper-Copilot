@@ -2,7 +2,11 @@
   "$schema": "./node_modules/nx/schemas/nx-schema.json",
   "analytics": false,
   "namedInputs": {
-    "default": ["{projectRoot}/**/*", "{workspaceRoot}/tsconfig.base.json"],
+    "default": [
+      "{projectRoot}/**/*",
+      "{workspaceRoot}/tsconfig.base.json",
+      "{workspaceRoot}/pnpm-lock.yaml"
+    ],
     "production": ["default", "!{projectRoot}/**/*.test.ts"]
   },
   "targetDefaults": {
