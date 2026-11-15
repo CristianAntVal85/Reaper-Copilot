@@ -79,7 +79,7 @@ Riesgos:
 
 - [x] **T1. Base del workspace.** `package.json` raíz, `pnpm-workspace.yaml` (`libs/*`, `libs/adapters/*`, `apps/*`), `nx.json` con caché para `typecheck`, `lint` y `test`, `tsconfig.base.json` estricto, `.nvmrc` y entradas nuevas en `.gitignore`.
   - Hecho cuando: en un clon limpio, `corepack enable && pnpm install` termina sin errores ni avisos de dependencias sin resolver, y `pnpm nx --version` responde.
-- [ ] **T2. `libs/core` con una prueba.** Paquete `@reaper-copilot/core` con `src/index.ts` que exporta `SCHEMA_VERSION = 1`, su prueba con Vitest y los scripts `typecheck` y `test`.
+- [x] **T2. `libs/core` con una prueba.** Paquete `@reaper-copilot/core` con `src/index.ts` que exporta `SCHEMA_VERSION = 1`, su prueba con Vitest y los scripts `typecheck` y `test`.
   - Hecho cuando: `pnpm nx run-many -t typecheck test` pasa con 1 prueba, y cambiar el valor esperado en la prueba lo hace fallar.
 - [ ] **T3. Lint y regla de dependencias.** `eslint.config.mjs` con `typescript-eslint` y `@nx/enforce-module-boundaries`; etiquetas `scope:core`, `scope:tools`, `scope:agent`, `scope:adapter`, `scope:app` con las restricciones de la sección 2; `core` no admite ningún import externo. Script `lint` en `core`.
   - Hecho cuando: `pnpm nx run-many -t lint` pasa, y añadir temporalmente `import 'node:fs'` o `import 'zod'` en `libs/core/src/index.ts` lo hace fallar con el mensaje de la regla (incluye la salida en la respuesta y retira el import).
