@@ -1,6 +1,6 @@
 # Reaper Copilot
 
-Documento maestro del proyecto (v2.4, 14-nov-2026). Es la fuente de verdad: sustituye a los borradores anteriores.
+Documento maestro del proyecto (v2.5, 15-nov-2026). Es la fuente de verdad: sustituye a los borradores anteriores.
 
 Lo leen tres públicos:
 
@@ -493,11 +493,12 @@ El spike de Reaper sin pantalla puede adelantarse a la fase 0 si el portátil es
 
 ### 14.1 Stack
 
-- **TypeScript 5+**, Node LTS (20 o superior), monorepo **Nx**.
+- **TypeScript 6** (lo limita `typescript-eslint`; se subirá a 7 cuando lo admita), **Node 24**.
+- Monorepo **Nx** con **pnpm** a través de Corepack, **ESLint** y **Vitest**.
 - **MCP:** `@modelcontextprotocol/sdk`. **Validación:** zod 3.25+.
 - **Backend Live:** NestJS. **Frontend:** Angular.
 - **LLM (solo Live):** `@anthropic-ai/sdk`. Su `toolRunner` está en beta; alternativa: un bucle propio detrás de `LlmPort`.
-- **Python 3.11+:** librosa, pyloudnorm, numpy, scipy, soundfile.
+- **Python 3.11+** con `venv` + `pip`: librosa, pyloudnorm, numpy, scipy, soundfile.
 - **Reaper** con puente en Lua y plugins de serie: nativo de Windows en desarrollo, para Linux en el servidor. **ffmpeg**. **SQLite**.
 
 ### 14.2 Pruebas

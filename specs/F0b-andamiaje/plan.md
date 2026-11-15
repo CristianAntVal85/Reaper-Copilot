@@ -89,7 +89,7 @@ Riesgos:
   - Hecho cuando: `pnpm py:setup && pnpm py:test` pasa con 1 prueba, `pnpm check:full` ejecuta también las pruebas de Python, y `pnpm check` sigue sin necesitar Python.
 - [x] **T6. CI.** `ci.yml` con un solo job: Node 24, pnpm por Corepack con caché, Python 3.12, `pnpm install --frozen-lockfile`, `pnpm py:setup`, `pnpm check:full`. Se mantiene: solo en pull requests y en `main`, cancelación de ejecuciones anteriores, permisos de solo lectura.
   - Hecho cuando: el YAML es válido y los pasos del job, ejecutados en local en ese orden sobre un clon limpio, terminan en verde. El verde en GitHub se comprueba en la demostración.
-- [ ] **T7. Documentación y permisos.** `CLAUDE.md`: quitar «a crear en la fase 0b» y el aviso de que los comandos no existen; añadir `pnpm py:setup`. Skill `sdd`: quitar el párrafo «Antes del andamiaje». `.claude/settings.json`: permitir `pnpm nx`, `pnpm py:setup` y `pnpm py:test`. Documento maestro, sección 14.1: Node 24, pnpm, ESLint y Vitest, con su entrada en `CHANGELOG.md`. `docs/estado.md` al día.
+- [x] **T7. Documentación y permisos.** `CLAUDE.md`: quitar «a crear en la fase 0b» y el aviso de que los comandos no existen; añadir `pnpm py:setup`. Skill `sdd`: quitar el párrafo «Antes del andamiaje». `.claude/settings.json`: permitir `pnpm nx`, `pnpm py:setup` y `pnpm py:test`. Documento maestro, sección 14.1: Node 24, pnpm, ESLint y Vitest, con su entrada en `CHANGELOG.md`. `docs/estado.md` al día.
   - Hecho cuando: no queda ninguna mención a comandos «a crear» en `CLAUDE.md` ni en `.claude/`, `docs/estado.md` tiene 30 líneas o menos y `pnpm check:full` pasa.
 
 ## 6. Demostración de la fase

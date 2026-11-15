@@ -7,8 +7,6 @@ description: Úsala siempre que vayas a cambiar código de Reaper Copilot - eleg
 
 La ceremonia es proporcional al cambio. Hay cuatro vías; elige la más ligera que sirva.
 
-**Antes del andamiaje.** `pnpm check` no existe hasta que cierre la fase 0b (sección 13 del documento maestro). Hasta entonces solo valen la vía de spike y el hito `F0b-andamiaje`, cuya verificación por tarea es el «Hecho cuando» de cada tarea. Las vías directa y de cambio pequeño empiezan después.
-
 ## 1. Vías
 
 ### Directa (`/quick`)
