@@ -22,13 +22,12 @@ No leas el documento maestro entero en cada tarea: abre solo la sección que la 
 
 En caso de duda entre dos vías, elige la más ligera y sube si el cambio crece. Sube siempre a `/sdd-plan` si toca un contrato, un puerto, el puente de Reaper, la validación de rutas o la API Live.
 
-## Comandos *(a crear en la fase 0b, andamiaje)*
-
-Hasta que la fase 0b cierre no existen: solo se puede trabajar por `/spike` y `/sdd-plan F0b-andamiaje`.
+## Comandos
 
 - `pnpm check`: tipos, lint y pruebas unitarias de lo afectado. Debe tardar segundos. Es la verificación de cada tarea.
 - `pnpm check:full`: todo lo anterior en todo el repositorio, más pruebas de contrato y de Python. Se ejecuta al cerrar una fase.
-- `pnpm test:reaper`: integración con Reaper real. Solo en local, con Reaper abierto.
+- `pnpm py:setup`: crea `python/analysis/.venv` e instala el paquete. Se ejecuta una vez, antes de `pnpm check:full`.
+- `pnpm test:reaper`: integración con Reaper real. Solo en local, con Reaper abierto. Llega en la fase 2.
 
 ## Estructura
 

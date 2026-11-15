@@ -1,0 +1,25 @@
+{
+  "name": "reaper-copilot",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.21.0",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "check": "nx affected -t typecheck lint test --base=$(git branch --show-current | grep -qx main && echo HEAD~1 || echo main)",
+    "check:full": "nx run-many -t typecheck lint test && pnpm py:test",
+    "py:setup": "python3 -m venv python/analysis/.venv && python/analysis/.venv/bin/pip install -e \"python/analysis[dev]\"",
+    "py:test": "test -x python/analysis/.venv/bin/python || { echo 'Python environment missing: run pnpm py:setup first' >&2; exit 1; } && python/analysis/.venv/bin/python -m pytest python/analysis"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@nx/eslint-plugin": "^24.0.6",
+    "@types/node": "^24.19.2",
+    "eslint": "^10.15.0",
+    "nx": "^24.0.6",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.72.2",
+    "vitest": "^5.1.0"
+  }
+}

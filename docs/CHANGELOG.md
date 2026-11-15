@@ -2,6 +2,10 @@
 
 Entradas nuevas arriba. Una línea por cambio relevante: fecha, fase o vía, qué se hizo y, si cambió una decisión del documento maestro, cuál.
 
+## 2026-11-15
+- Documento maestro v2.5: stack concretado, con Node 24 en lugar de «20 o superior», TypeScript 6, pnpm, ESLint y Vitest. Sección 14.1. La sección 11.3 decía «Node LTS»: ahora dice Node 24, sin subir la versión del documento.
+- Fase F0b implementada y revisada, pendiente del CI en la pull request y de la fusión (el cierre se anotará al fusionar): monorepo Nx con pnpm, `pnpm check` y `pnpm check:full`, esqueleto de `python/analysis` y CI en un job.
+
 ## 2026-11-14
 - Documento maestro v2.4: método de tempo por búsqueda fina en lugar de `librosa.feature.tempo`; `tempo.confidence` y umbral de `unmeasured`; preguntas abiertas 10 y 11. Sección 8.1. Origen: spike `librosa-bpm-alto`.
 - Fase 0 cerrada: spikes de Reaper (WSL y Windows), librosa y MCP.

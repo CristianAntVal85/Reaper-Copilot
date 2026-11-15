@@ -3,6 +3,9 @@
     "allow": [
       "Bash(pnpm check)",
       "Bash(pnpm check:full)",
+      "Bash(pnpm nx *)",
+      "Bash(pnpm py:setup)",
+      "Bash(pnpm py:test)",
       "Bash(git status*)",
       "Bash(git diff*)",
       "Bash(git log*)"
