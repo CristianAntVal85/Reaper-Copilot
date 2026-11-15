@@ -1,0 +1,16 @@
+{
+  "$schema": "./node_modules/nx/schemas/nx-schema.json",
+  "analytics": false,
+  "namedInputs": {
+    "default": ["{projectRoot}/**/*", "{workspaceRoot}/tsconfig.base.json"],
+    "production": ["default", "!{projectRoot}/**/*.test.ts"]
+  },
+  "targetDefaults": {
+    "typecheck": { "cache": true, "inputs": ["default", "^production"] },
+    "lint": {
+      "cache": true,
+      "inputs": ["default", "{workspaceRoot}/eslint.config.mjs"]
+    },
+    "test": { "cache": true, "inputs": ["default", "^production"] }
+  }
+}

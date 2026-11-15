@@ -77,7 +77,7 @@ Riesgos:
 
 ## 5. Tareas
 
-- [ ] **T1. Base del workspace.** `package.json` raíz, `pnpm-workspace.yaml` (`libs/*`, `libs/adapters/*`, `apps/*`), `nx.json` con caché para `typecheck`, `lint` y `test`, `tsconfig.base.json` estricto, `.nvmrc` y entradas nuevas en `.gitignore`.
+- [x] **T1. Base del workspace.** `package.json` raíz, `pnpm-workspace.yaml` (`libs/*`, `libs/adapters/*`, `apps/*`), `nx.json` con caché para `typecheck`, `lint` y `test`, `tsconfig.base.json` estricto, `.nvmrc` y entradas nuevas en `.gitignore`.
   - Hecho cuando: en un clon limpio, `corepack enable && pnpm install` termina sin errores ni avisos de dependencias sin resolver, y `pnpm nx --version` responde.
 - [ ] **T2. `libs/core` con una prueba.** Paquete `@reaper-copilot/core` con `src/index.ts` que exporta `SCHEMA_VERSION = 1`, su prueba con Vitest y los scripts `typecheck` y `test`.
   - Hecho cuando: `pnpm nx run-many -t typecheck test` pasa con 1 prueba, y cambiar el valor esperado en la prueba lo hace fallar.
