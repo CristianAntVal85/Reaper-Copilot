@@ -6,6 +6,10 @@
   "engines": {
     "node": ">=24 <25"
   },
+  "scripts": {
+    "check": "nx affected -t typecheck lint test --base=$(git branch --show-current | grep -qx main && echo HEAD~1 || echo main)",
+    "check:full": "nx run-many -t typecheck lint test"
+  },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@nx/eslint-plugin": "^24.0.6",

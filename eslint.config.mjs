@@ -41,7 +41,7 @@ export default tseslint.config(
   {
     // Constitution rule 6: core production code imports nothing external.
     // Bare specifiers ('zod', 'node:fs', '@scope/pkg') are banned; relative paths are fine.
-    // Done here and not with bannedExternalImports because that option ignores Node built-ins.
+    // The regex matches every specifier that is not relative: npm packages and Node modules alike.
     files: ["libs/core/**/*.ts"],
     ignores: ["libs/core/**/*.test.ts"],
     rules: {
