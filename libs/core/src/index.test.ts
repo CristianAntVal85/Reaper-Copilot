@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SCHEMA_VERSION } from "./index.js";
+import { SCHEMA_VERSION } from "./index.ts";
 
 describe("core", () => {
   it("exposes the schema version", () => {

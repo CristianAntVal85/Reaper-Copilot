@@ -40,9 +40,12 @@ jobs:
           key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: pnpm-store-${{ runner.os }}-
 
+      # La caché de pip se indexa por el pyproject.toml del paquete de análisis.
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: python/analysis/pyproject.toml
 
       - run: pnpm install --frozen-lockfile
       - run: pnpm py:setup

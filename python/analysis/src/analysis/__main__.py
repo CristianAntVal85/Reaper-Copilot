@@ -1,12 +1,5 @@
-import argparse
+import sys
 
-from analysis import __version__
+from analysis.cli import main
 
-
-def main() -> None:
-    parser = argparse.ArgumentParser(prog="analysis")
-    parser.add_argument("--version", action="version", version=__version__)
-    parser.parse_args()
-
-
-main()
+sys.exit(main())

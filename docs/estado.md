@@ -2,19 +2,19 @@
 
 Memoria entre sesiones. **Máximo 30 líneas, una idea por línea.** Lo que ya no sirva para decidir el siguiente paso se mueve a `docs/CHANGELOG.md`. Sin recuentos de pruebas: se obtienen ejecutando `pnpm check:full`.
 
-Última actualización: 2026-11-15
+Última actualización: 2026-11-16
 
 ## Dónde estamos
-- Fase F0b-andamiaje implementada (7 de 7 tareas), revisada (APROBADO) y con las correcciones aplicadas.
-- Rama: `fase/F0b-andamiaje`, sin push.
+- F1a-analisis implementada (8 de 8 tareas) en `fase/F1a-analisis`, sin push; plan en `specs/F1a-analisis/plan.md`. La revisión dio CAMBIOS NECESARIOS por un hallazgo medio (rutas y stderr hacia el cliente); corregido, pendiente de re-revisión de seguridad.
+- Pendientes bajos: sin límite de tamaño ni memoria del audio; `invalid_analysis_output` genérico en `server.ts`; `MODE=agent` de `.mcp.json` y `mcp:call` en `mentor` al llegar la escritura (fase 2); cola de un solo análisis para Live.
 
 ## Siguiente paso
-- Push, pull request a `main` (ahí se comprueba el CI) y fusión; después, `/sdd-plan` de la fase 1.
+- Re-revisión de seguridad de F1a-analisis (`reviewer-security`).
+- Demostración, paso 5 (usuario, a mano): aprobar el servidor en sesión nueva de terminal y de VS Code, y pedir un análisis.
+- Push y pull request a `main` con el CI en verde. Después, F1b (`compare_audio`, caché, trazas).
 
 ## Hecho
-- Fase 0: los tres spikes funcionan (puente de Reaper, MCP mínimo, tempo con librosa). Detalle en `docs/CHANGELOG.md` y `specs/spikes/`.
-- Fase F0b: monorepo Nx con pnpm, `pnpm check` y `pnpm check:full`, esqueleto de Python y CI.
-- Diseño en `docs/reaper-copilot.md` v2.5.
+- Fases 0 y F0b cerradas (spikes, monorepo Nx, CI); diseño en `docs/reaper-copilot.md` v2.6. Detalle en `docs/CHANGELOG.md`.
 
 ## Pendiente de decidir (usuario)
 - Idioma del README y de la interfaz del Replay.

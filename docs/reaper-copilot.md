@@ -1,6 +1,6 @@
 # Reaper Copilot
 
-Documento maestro del proyecto (v2.5, 15-nov-2026). Es la fuente de verdad: sustituye a los borradores anteriores.
+Documento maestro del proyecto (v2.6, 16-nov-2026). Es la fuente de verdad: sustituye a los borradores anteriores.
 
 Lo leen tres públicos:
 
@@ -42,7 +42,7 @@ El producto se entrega en **tres bloques** sobre un mismo núcleo:
 
 ### 2.1 Reglas no negociables
 
-- **Núcleo sin dependencias externas.** `libs/core` no importa NestJS, Angular, Reaper, Python ni SDKs de terceros.
+- **Núcleo sin dependencias externas.** `libs/core` no importa NestJS, Angular, Reaper, Python ni SDKs de terceros. Única excepción: `zod`, para definir cada contrato una sola vez (esquema y tipo salen del mismo código).
 - **Herramientas definidas una sola vez** en `libs/tools`, y reutilizadas por el servidor MCP y por el agente del modo Live.
 - **Solo herramientas MCP estándar (tools).** No depender de prompts, elicitación, tareas ni sampling del protocolo.
 - **Conjunto cerrado de comandos hacia Reaper.** No existe ninguna herramienta que ejecute código arbitrario (Lua, shell).
@@ -186,7 +186,7 @@ reaper-copilot/
 └─ docs/
 ```
 
-**Regla de dependencias:** `core` ← `tools` ← `agent` ← `apps`. Los adaptadores solo dependen de `core`. Las `apps` cablean puertos y adaptadores.
+**Regla de dependencias:** `core` ← `tools` ← `agent` ← `apps`. Los adaptadores solo dependen de `core`. `testing` solo depende de `core` y lo usan `tools`, `agent` y `apps` (solo en pruebas). Las `apps` cablean puertos y adaptadores.
 
 ### 6.4 Puertos
 
@@ -203,8 +203,8 @@ interface DawPort {
 }
 
 interface AnalyzerPort {
-  analyze(path: AssetPath): Promise<AudioFeatures>;
-  compare(a: AssetPath, b: AssetPath): Promise<FeatureDiff>;
+  analyze(path: AssetPath, options?: { targetBpm?: number }): Promise<AudioFeatures>;
+  compare(a: AssetPath, b: AssetPath): Promise<FeatureDiff>; // llega en F1b
 }
 
 interface StoragePort { /* tareas, trazas, trabajos, caché de análisis, assets */ }
@@ -222,7 +222,7 @@ Conjunto cerrado. Pocas, de alto nivel y con descripciones claras.
 
 | Herramienta | Riesgo | Descripción |
 |---|---|---|
-| `analyze_audio` | lectura | Analiza un archivo y devuelve JSON compacto. Caché por sha256 |
+| `analyze_audio` | lectura | Analiza un archivo y devuelve JSON compacto. Caché por sha256 (desde F1b) |
 | `compare_audio` | lectura | Diferencias entre dos análisis |
 | `get_project_state` | lectura | Pistas, items y tempo del proyecto |
 | `list_presets` | lectura | Presets de FX con sus parámetros y rangos |
@@ -247,8 +247,8 @@ En modo `mentor` solo se exponen las de lectura.
 
 ### 8.1 TypeScript con Python
 
-- CLI: `python -m analysis analyze <ruta> [--target-bpm N]` y `python -m analysis compare <a> <b>`.
-- Salida JSON por stdout; errores por stderr con código de salida distinto de cero.
+- CLI: `python -m analysis analyze [--target-bpm N] -- <ruta>` (F1a) y `python -m analysis compare <a> <b>` (F1b). El `--` evita que un nombre de archivo se lea como opción.
+- Salida JSON por stdout; errores por stderr con un código legible al principio (`file_not_found: …`) y código de salida distinto de cero: 2 `file_not_found` (inexistente o ilegible), 3 `unsupported_format` (formato no admitido, audio de menos de 0,5 s o fallo al decodificar), 1 `analysis_failed` (cualquier otro error, incluidos los de argumentos).
 
 ```json
 {
@@ -262,7 +262,16 @@ En modo `mentor` solo se exponen las de lectura.
 }
 ```
 
-- El esquema vive en zod; hay tests de contrato contra la salida real de Python.
+- El esquema vive en zod (`AudioFeaturesSchema`, en `libs/core`) y es estricto: no admite campos extra. Hay tests de contrato contra la salida real de Python (`test:contract`).
+- **Archivo.** `sha256` son los bytes del archivo, en hexadecimal minúscula. `durationSec`, `sampleRate` y `channels` son los del archivo original y positivos.
+- **Tonalidad.** `tonic` es una de `C, C#, D, D#, E, F, F#, G, G#, A, A#, B`; `mode`, `major` o `minor`; las confianzas van de 0 a 1. Se obtiene del croma CQT y los perfiles de Krumhansl-Kessler. En silencio sale `C major` con confianza 0.
+- **Sonoridad y dinámica.** `integratedLufs` con pyloudnorm. `peakDb` es el pico de muestra entre todos los canales. `crestFactorDb` es el pico menos el RMS global, con mínimo 0.
+- **Bandas** (Hz, intervalos [bajo, alto)): `sub` 20-60, `bass` 60-250, `lowMid` 250-500, `mid` 500-2000, `highMid` 2000-6000, `high` 6000-20000. Se calculan sobre la mezcla mono con Welch, en dB relativos a un seno de fondo de escala: un seno a −12 dBFS da −12 en su banda.
+- **Números finitos.** Lo que saldría como menos infinito (silencio) se limita a −120. Redondeo: dB y BPM a 2 decimales, confianzas a 3.
+- **Errores de dominio** (`CopilotError`, lista cerrada de códigos): `path_outside_workspace`, `file_not_found`, `unsupported_format`, `analysis_failed`, `analysis_timeout`, `invalid_analysis_output`. El servidor MCP los devuelve con `isError: true` y el código al principio del mensaje. Para un error inesperado devuelve `internal_error: the tool failed unexpectedly`: es un código del protocolo, no del dominio, y el detalle solo va por stderr.
+- **Adaptador** (`libs/adapters/analysis-py`): proceso hijo sin shell, tiempo límite de 120 s por defecto, stdout de 1 MB como máximo y stderr truncado a 8 KiB. La salida se valida con el esquema antes de devolverla.
+- **Rutas.** Relativas al workspace (`<repositorio>/workspace` por defecto, ignorado por git y que hay que crear; se cambia con `COPILOT_WORKSPACE`) o absolutas dentro de él. Se comprueba de forma léxica y otra vez tras `realpath`; extensiones admitidas: `.wav .flac .mp3 .aiff .ogg`.
+- **Servidor MCP** (`apps/mcp-server`, stdio). Variables: `MODE` (`mentor` por defecto; un valor inválido hace fallar el arranque), `COPILOT_WORKSPACE` y `COPILOT_PYTHON` (por defecto `python/analysis/.venv/bin/python`). El `.mcp.json` de la raíz lo registra con `MODE=agent`. `pnpm mcp:call <herramienta> '<json>'` llama a una herramienta desde la terminal. Medido: unos 1,7 s por análisis de 12 s de audio, casi todo arranque de librosa.
 - **Método de tempo.** `librosa.feature.tempo` no se usa como medida final: sin pista cae a la mitad entre 180 y 210 BPM, y su resolución no permite afinar a ±1 BPM. El tempo se obtiene con una búsqueda fina (pasos de 0,05 BPM) sobre la autocorrelación de la envolvente de ataques, calculada con librosa y `hop_length=64`, puntuando cada candidato a 1, 2, 4 y 8 tiempos.
 - **Rango de búsqueda.** Con tempo objetivo, ±4 % alrededor. Sin él, el rango del género (140-230 BPM). En ambos casos se devuelven las alternativas mitad y doble.
 - **`tempo.confidence` es la puntuación de esa búsqueda** (0 a 1). Por debajo de 0,10 el tempo no se considera medible y el criterio de BPM devuelve `unmeasured` (sección 9.2). Umbral provisional.
@@ -431,7 +440,7 @@ Lista de trabajo. Los comandos concretos se validan en la fase 4.
 ### 11.3 Aplicación
 
 - Usuario de sistema sin privilegios (por ejemplo `copilot`) dueño del workspace.
-- Dependencias: Node 24, Python 3.11+ con entorno virtual, ffmpeg, Reaper para Linux.
+- Dependencias: Node 24, Python 3.11+ con entorno virtual, Reaper para Linux. F1a lee MP3 con `soundfile` (libsndfile ≥ 1.1) y no necesita ffmpeg; ffmpeg solo se añadiría si una fase posterior lo requiere.
 - **Reaper sin pantalla:** arrancarlo sobre una pantalla virtual (Xvfb) con `bridge.lua` cargado al inicio *(a comprobar; es un spike)*. El render no necesita dispositivo de audio.
 - **Licencia de Reaper:** revisar las condiciones para una demo pública antes de desplegar.
 - Servicios `systemd` con `Restart=always` para: pantalla virtual + Reaper, API NestJS y túnel. Arranque automático al encender.
@@ -479,7 +488,8 @@ Lista de trabajo. Los comandos concretos se validan en la fase 4.
 |---|---|---|
 | **0. Spikes** | (1) Reaper en WSL ejecuta `bridge.lua` y responde por IPC. (2) librosa sobre samples de 170-200 BPM, comprobando doble y mitad. (3) Servidor MCP mínimo con una herramienta, probado en Claude Code en terminal y en la extensión de VS Code, incluido el flujo de aprobación | Los tres funcionan o hay alternativa documentada |
 | **0b. Andamiaje** | Repositorio git y `.gitignore`; monorepo Nx con pnpm; `libs/core` vacía con una prueba; `pnpm check` y `pnpm check:full`; paquete Python con `pytest`; CI ajustado | `pnpm check` y `pnpm check:full` en verde en local y el CI en verde en una pull request |
-| **1. MCP con análisis** | `core`, `tools`, adaptador de Python, `analyze_audio`, `compare_audio`, SQLite con trazas, fakes | Pedir un análisis desde Claude Code y recibir JSON validado |
+| **1a. MCP con análisis** | `core`, `tools`, adaptador de Python, `analyze_audio`, servidor MCP por stdio, `FakeAnalyzer` | Pedir un análisis desde Claude Code y recibir JSON validado |
+| **1b. Comparación y trazas** | `compare_audio`, caché por sha256, SQLite con trazas | Comparar dos archivos desde Claude Code; el segundo análisis del mismo archivo sale de la caché |
 | **2. MCP con Reaper** | Adaptador de Reaper, herramientas que modifican, presets, render asíncrono, `start_task`, `verify_task`, modos | El caso "loop a 170" de punta a punta desde Claude Code, verificado con criterios |
 | **3. Replay** | `export-replay`, aplicación Angular con reproductor, forma de onda, espectro y pasos; despliegue estático | URL pública con al menos tres ejecuciones reales |
 | **4. Live** | Spike de Reaper sin pantalla en el portátil; `LlmPort`, bucle del agente, API NestJS, cola, invitaciones, límites; preparación del servidor y túnel | Ejecución en vivo desde la web con código de invitación y tope de gasto activo |
@@ -495,11 +505,13 @@ El spike de Reaper sin pantalla puede adelantarse a la fase 0 si el portátil es
 
 - **TypeScript 6** (lo limita `typescript-eslint`; se subirá a 7 cuando lo admita), **Node 24**.
 - Monorepo **Nx** con **pnpm** a través de Corepack, **ESLint** y **Vitest**.
-- **MCP:** `@modelcontextprotocol/sdk`. **Validación:** zod 3.25+.
+- **MCP:** `@modelcontextprotocol/sdk` 1.32 o posterior. **Validación:** zod 4.
+- **TypeScript sin compilar:** Node 24 ejecuta los `.ts` directamente. Los imports relativos llevan extensión `.ts` y solo se usa sintaxis borrable (`erasableSyntaxOnly`: sin `enum`, `namespace` ni propiedades de parámetro en constructores).
+- **`check:full`:** typecheck, lint y test de todo el repositorio, más `pnpm py:test` y `nx run-many -t test:contract`.
 - **Backend Live:** NestJS. **Frontend:** Angular.
 - **LLM (solo Live):** `@anthropic-ai/sdk`. Su `toolRunner` está en beta; alternativa: un bucle propio detrás de `LlmPort`.
 - **Python 3.11+** con `venv` + `pip`: librosa, pyloudnorm, numpy, scipy, soundfile.
-- **Reaper** con puente en Lua y plugins de serie: nativo de Windows en desarrollo, para Linux en el servidor. **ffmpeg**. **SQLite**.
+- **Reaper** con puente en Lua y plugins de serie: nativo de Windows en desarrollo, para Linux en el servidor. **ffmpeg** (no en F1a; ver §11.3). **SQLite**.
 
 ### 14.2 Pruebas
 

@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "reaper-copilot": {
+      "command": "node",
+      "args": ["apps/mcp-server/src/main.ts"],
+      "env": {
+        "MODE": "agent"
+      }
+    }
+  }
+}

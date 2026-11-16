@@ -12,7 +12,7 @@ Principios innegociables. Un plan o un cambio que los contradiga se corrige ante
 
 ## Arquitectura
 
-6. **Núcleo sin dependencias externas.** `libs/core` no importa NestJS, Angular, Reaper, Python ni SDKs de terceros.
+6. **Núcleo sin dependencias externas.** `libs/core` no importa NestJS, Angular, Reaper, Python ni SDKs de terceros. Única excepción: `zod`, para definir cada contrato una sola vez (decisión de F1a).
 7. **Lo externo, detrás de puertos:** `DawPort`, `AnalyzerPort`, `StoragePort`, `LlmPort`, `KnowledgePort`.
 8. **Herramientas definidas una sola vez** en `libs/tools`, reutilizadas por el servidor MCP y por el agente Live.
 9. **Solo herramientas MCP estándar.** Sin depender de prompts, elicitación, tareas ni sampling.
