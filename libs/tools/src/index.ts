@@ -1,4 +1,5 @@
 export * from "./analyze-audio.ts";
+export * from "./analyze-with-cache.ts";
 export * from "./registry.ts";
 export * from "./resolve-asset-path.ts";
 export * from "./tool-definition.ts";

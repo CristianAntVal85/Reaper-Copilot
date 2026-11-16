@@ -4,7 +4,7 @@ import path from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { AudioFeaturesSchema, CopilotError } from "@reaper-copilot/core";
-import { FakeAnalyzer, SAMPLE_AUDIO_FEATURES } from "@reaper-copilot/testing";
+import { FakeAnalyzer, FakeStorage, SAMPLE_AUDIO_FEATURES } from "@reaper-copilot/testing";
 import {
   ALL_TOOLS,
   createToolRegistry,
@@ -66,7 +66,7 @@ async function connect(options: {
   const registry = createToolRegistry([...ALL_TOOLS, ...(options.extraTools ?? [])], options.mode);
   const server = createServer({
     registry,
-    context: { workspaceRoot: ws, analyzer },
+    context: { workspaceRoot: ws, analyzer, storage: new FakeStorage(), log: () => {} },
     log: options.log ?? (() => {}),
   });
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();

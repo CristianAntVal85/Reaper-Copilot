@@ -1,4 +1,4 @@
-import type { AnalyzerPort } from "@reaper-copilot/core";
+import type { AnalyzerPort, StoragePort } from "@reaper-copilot/core";
 import type { z } from "zod";
 
 export const TOOL_MODES = ["mentor", "agent"] as const;
@@ -11,6 +11,16 @@ export interface ToolContext {
   /** Directory every asset path must stay inside (constitution, rule 13). */
   readonly workspaceRoot: string;
   readonly analyzer: AnalyzerPort;
+  readonly storage: StoragePort;
+  /** Diagnostics for the operator (stderr in the server); never part of a tool response. */
+  readonly log: (message: string) => void;
+  /** Per-call counters; `invokeTool` provides it so the trace can report `cacheHits`. */
+  readonly trace?: CallTrace;
+}
+
+/** Counters a handler may bump while it runs; scoped to a single tool call. */
+export interface CallTrace {
+  cacheHit(): void;
 }
 
 export interface ToolDefinition<
