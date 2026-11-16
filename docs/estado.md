@@ -5,12 +5,11 @@ Memoria entre sesiones. **Máximo 30 líneas, una idea por línea.** Lo que ya n
 Última actualización: 2026-11-16
 
 ## Dónde estamos
-- F1a-analisis cerrada y fusionada (pull request #3). Rama nueva `fase/F1b-comparacion`, sin plan todavía.
+- F1a cerrada (pull request #3). F1b-comparacion: plan aprobado en `specs/F1b-comparacion/plan.md`, en implementación, rama `fase/F1b-comparacion`.
 - Pendientes bajos: sin límite de tamaño ni memoria del audio; `invalid_analysis_output` genérico en `server.ts`; `MODE=agent` de `.mcp.json` y `mcp:call` en `mentor` al llegar la escritura (fase 2); cola de un solo análisis para Live.
 
 ## Siguiente paso
-- `/sdd-plan F1b-comparacion`: `compare_audio`, caché por sha256 y trazas en SQLite.
-- Demostración de F1a, paso 5 (usuario, a mano): aprobar el servidor en sesión nueva de terminal y de VS Code, y pedir un análisis.
+- Implementar T1-T8 de F1b con `/sdd-implement F1b-comparacion`.
 
 ## Hecho
 - Fases 0, F0b y F1a cerradas (spikes, monorepo Nx, CI, `analyze_audio` por MCP); diseño en `docs/reaper-copilot.md` v2.6. Detalle en `docs/CHANGELOG.md`.
