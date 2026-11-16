@@ -208,6 +208,9 @@ importers:
       '@reaper-copilot/adapter-analysis-py':
         specifier: workspace:*
         version: link:../../libs/adapters/analysis-py
+      '@reaper-copilot/adapter-reaper':
+        specifier: workspace:*
+        version: link:../../libs/adapters/reaper
       '@reaper-copilot/adapter-storage-sqlite':
         specifier: workspace:*
         version: link:../../libs/adapters/storage-sqlite

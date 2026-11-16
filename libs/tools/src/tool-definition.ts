@@ -12,9 +12,9 @@ export interface ToolContext {
   readonly workspaceRoot: string;
   readonly analyzer: AnalyzerPort;
   readonly storage: StoragePort;
-  /** Reaper, when the server has one configured (wired by the server in T7). */
+  /** Reaper, when the server has one configured (wired by the server). */
   readonly daw?: DawPort;
-  /** Loaded FX presets (wired by the server in T7). */
+  /** Loaded FX presets (wired by the server). */
   readonly presets?: readonly Preset[];
   /** Diagnostics for the operator (stderr in the server); never part of a tool response. */
   readonly log: (message: string) => void;
