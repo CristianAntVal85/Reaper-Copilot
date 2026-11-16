@@ -8,6 +8,9 @@ export const AUDIO_FEATURES_SCHEMA_VERSION = 2;
  */
 export const ANALYSIS_REVISION = "1";
 
+/** Revision part of the analysis cache key: contract version plus method revision. */
+export const ANALYSIS_CACHE_REVISION = `${AUDIO_FEATURES_SCHEMA_VERSION}.${ANALYSIS_REVISION}`;
+
 export const TONICS = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"] as const;
 
 const finite = z.number().finite();
