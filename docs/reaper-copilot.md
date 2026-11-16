@@ -1,6 +1,6 @@
 # Reaper Copilot
 
-Documento maestro del proyecto (v2.8, 16-nov-2026). Es la fuente de verdad: sustituye a los borradores anteriores.
+Documento maestro del proyecto (v2.9, 16-nov-2026). Es la fuente de verdad: sustituye a los borradores anteriores.
 
 Lo leen tres públicos:
 
@@ -194,13 +194,14 @@ reaper-copilot/
 ```ts
 interface DawPort {
   getProjectState(): Promise<ProjectState>;
-  setTempo(bpm: number): Promise<void>;
-  importAudio(path: AssetPath): Promise<ItemRef>;
-  sliceByBars(item: ItemRef, startBar: number, bars: number): Promise<ItemRef>;
-  stretchToTempo(item: ItemRef, targetBpm: number): Promise<ItemRef>;
-  applyFxChain(track: TrackRef, preset: PresetId, params?: Record<string, number>): Promise<void>;
-  render(opts: RenderOpts): Promise<JobId>;
-  undo(steps: number): Promise<void>;
+  setTempo(bpm: number): Promise<{ tempo: number }>;
+  importAudio(path: AssetPath): Promise<{ track: TrackRef; item: DawItem }>;
+  sliceByBars(item: ItemId, spec: SliceSpec): Promise<DawItem>;      // sourceBpm, startBar, bars, beatsPerBar, offsetSec
+  stretchToTempo(item: ItemId, spec: StretchSpec): Promise<DawItem>; // sourceBpm, targetBpm
+  applyFxChain(track: TrackId, chain: FxChain): Promise<AppliedFxChain>;
+  render(item: ItemId, output: AssetPath): Promise<JobId>;
+  getJob(job: JobId): Promise<JobStatus>;
+  undo(): Promise<{ undone: string }>;
 }
 
 interface AnalyzerPort {
@@ -225,7 +226,7 @@ interface StoragePort {
 interface LlmPort { runTurn(input: TurnInput): AsyncIterable<LlmEvent>; } // solo Live
 ```
 
-Son un punto de partida; el planificador puede ajustarlos. `AnalyzerPort` no tiene `compare`: la comparación es una función pura de `core` (`compareFeatures`) sobre dos `AudioFeatures`, así reutiliza la caché y no vuelve a cargar librosa.
+Son un punto de partida; el planificador puede ajustarlos. Los tipos de `DawPort` salen de esquemas zod en `libs/core` (`ProjectState`, `DawItem`, `FxChain`, `AppliedFxChain`, `JobStatus`, `PresetSchema`). `DawItem.source` es la ruta absoluta de Linux de la fuente (o `null`); las herramientas la devuelven relativa al workspace, o `null` si está fuera de él, y nunca rutas absolutas ni UNC. `AnalyzerPort` no tiene `compare`: la comparación es una función pura de `core` (`compareFeatures`) sobre dos `AudioFeatures`, así reutiliza la caché y no vuelve a cargar librosa.
 
 ---
 
@@ -237,22 +238,22 @@ Conjunto cerrado. Pocas, de alto nivel y con descripciones claras.
 |---|---|---|
 | `analyze_audio` | lectura | Analiza un archivo y devuelve JSON compacto. Caché por sha256 de los bytes del archivo, el `targetBpm` y la revisión del método de análisis (sección 9.3) |
 | `compare_audio` | lectura | Diferencias entre dos análisis. Entrada `{ a: { path, targetBpm? }, b: { path, targetBpm? } }`. Salida `{ a, b, metrics, tempo, key }`: `a` y `b` con la ruta del cliente y el sha256; `metrics` con las 11 métricas de la sección 9.2, cada una con `a`, `b` y `delta = b − a` (2 decimales); `tempo` con `confidence` y `target` de cada lado; `key` con `a`, `b` y `same`. Usa la caché |
-| `get_project_state` | lectura | Pistas, items y tempo del proyecto |
-| `list_presets` | lectura | Presets de FX con sus parámetros y rangos |
-| `get_job_status` | lectura | Estado de un render o análisis largo |
+| `get_project_state` | lectura | Pistas, items y tempo del proyecto: `{ tempo, lengthSec, tracks: [{ id, name, fx, items: [{ id, trackId, positionSec, lengthSec, startOffsetSec, playRate, source }] }] }`. Los ids son GUID de Reaper; `source` es relativa al workspace o `null` |
+| `list_presets` | lectura | Presets de FX con sus `knobs`: `{ presets: [{ id, description, knobs: { <nombre>: { description, unit, min, max, default } } }] }` |
+| `get_job_status` | lectura | Entrada `{ jobId }`. Salida `{ jobId, status: "rendering" \| "done" \| "failed", output: { path, durationSec } \| null, errorCode \| null }`; `path` relativa al workspace. Responde sin preguntar a Reaper. No anuncia `outputSchema` por MCP (unión discriminada) |
 | `verify_task` | lectura | Mide el render y devuelve el resultado por criterio (sección 9.2). No acepta criterios |
 | `start_task` | modifica (ligero) | Registra la petición literal, el audio de origen, el objetivo y los criterios (sección 9.2) |
-| `import_audio` | modifica | Importa desde el workspace; el original no se toca |
-| `set_tempo` | modifica | Cambia el tempo del proyecto |
-| `slice_loop` | modifica | Corta un loop por compases |
-| `time_stretch` | modifica | Estira al BPM objetivo |
-| `apply_fx_chain` | modifica | Aplica un preset con parámetros dentro de rango |
-| `render_selection` | modifica | Asíncrono: devuelve `jobId` |
-| `undo_last` | modifica | Deshace el último bloque |
+| `import_audio` | modifica | `{ path }` → `{ track, item }`. Importa desde el workspace en una pista nueva; el original no se toca |
+| `set_tempo` | modifica | `{ bpm }` (40-320) → `{ tempo }` |
+| `slice_loop` | modifica | `{ itemId, sourceBpm, startBar, bars, beatsPerBar?, offsetSec? }` → item. Corte absoluto (idempotente); `out_of_range` si se sale de la fuente |
+| `time_stretch` | modifica | `{ itemId, sourceBpm, targetBpm }` → item. Estirado absoluto (idempotente); la tasa debe quedar en [0,5, 2] |
+| `apply_fx_chain` | modifica | `{ trackId, preset, knobs? }` → `{ trackId, preset, fx: [{ plugin, params: [{ name, text }] }] }`. Añade la cadena al final de la pista, sin tocar los FX existentes; los `knobs` fuera de rango o desconocidos se rechazan antes de llamar a Reaper y los omitidos toman su valor por defecto. Para reajustar: `undo_last` y aplicar otra vez |
+| `render_selection` | modifica | `{ itemId }` → `{ jobId }`. Asíncrono. Renderiza la mezcla del master (otras pistas que suenen en ese tramo entran en el render) en los límites del item, a `workspace/renders/<AAAAMMDD-HHMMSS UTC>-<8 hex>.wav` (nombre generado por el servidor) |
+| `undo_last` | modifica | `{}` → `{ undone }`. Deshace el último bloque solo si su etiqueta empieza por `Copilot: `; si no, `nothing_to_undo`. Nunca deshace trabajo del usuario |
 
-En modo `mentor` solo se exponen las de lectura.
+En modo `mentor` solo se exponen las de lectura: en F2a, cinco (`get_project_state`, `list_presets`, `get_job_status`, `analyze_audio`, `compare_audio`). En `agent`, las 12 de F2a (`start_task` y `verify_task` llegan en F2b).
 
-**Presets de FX como datos.** Las cadenas (por ejemplo `distortion_hard`, `kick_punch`) son JSON versionado en `reaper/presets/`, con plugins de serie de Reaper (ReaEQ, ReaComp, ReaPitch, ReaSamplOmatic5000, efectos JS de distorsión y limitador), parámetros y rangos permitidos.
+**Presets de FX como datos.** Las cadenas son JSON versionado en `reaper/presets/` (un archivo por preset, validado con `PresetSchema` al arrancar el servidor; uno inválido impide el arranque), con plugins de serie de Reaper. Cada parámetro es un `knob` (ajustable dentro de su rango, con `description`, `unit`, `min`, `max` y `default`) o un `value` fijo; todo `knob` usado debe estar definido y `default` ha de caer en `[min, max]`. Los valores van en unidades mostradas (dB, Hz, %), no normalizados. Presets de F2a, provisionales: `distortion_hard` (`JS: Waveshaping Distortion` y `ReaLimit`; knobs `drive` 0-90 % y `threshold` −12..0 dB), `limiter_loud` (`ReaLimit`; `threshold` −12..0 dB y `ceiling` −3..0 dB) y `eq_lowcut` (`ReaEQ`, paso alto; `cutoff` 20-200 Hz). `COPILOT_PRESETS` cambia la carpeta.
 
 ---
 
@@ -283,10 +284,10 @@ En modo `mentor` solo se exponen las de lectura.
 - **Sonoridad y dinámica.** `integratedLufs` con pyloudnorm. `peakDb` es el pico de muestra del audio decodificado, entre todos los canales. No es pico real (*true peak*) y en formatos con pérdida puede superar 0 dBFS (medido: los MP3 de prueba, masterizados a ~−4 LUFS, tienen entre el 1 y el 3 % de muestras por encima de 0 dBFS y picos de hasta +5,45 dB). `crestFactorDb` es el pico menos el RMS global, con mínimo 0.
 - **Bandas** (Hz, intervalos [bajo, alto)): `sub` 20-60, `bass` 60-250, `lowMid` 250-500, `mid` 500-2000, `highMid` 2000-6000, `high` 6000-20000. Se calculan sobre la mezcla mono con Welch, en dB relativos a un seno de fondo de escala: un seno a −12 dBFS da −12 en su banda.
 - **Números finitos.** Lo que saldría como menos infinito (silencio) se limita a −120. Redondeo: dB y BPM a 2 decimales, confianzas a 3.
-- **Errores de dominio** (`CopilotError`, lista cerrada de códigos): `path_outside_workspace`, `file_not_found`, `unsupported_format`, `analysis_failed`, `analysis_timeout`, `invalid_analysis_output`. El servidor MCP los devuelve con `isError: true` y el código al principio del mensaje. Hay además dos códigos de protocolo, fuera de la lista de dominio: `internal_error` (error inesperado o salida de una herramienta fuera de su esquema; antes esto último daba `invalid_analysis_output`), con el mensaje `internal_error: the tool failed unexpectedly`, e `invalid_input` (entrada que no cumple el esquema; mensaje fijo). El detalle de ambos solo va al registro (stderr).
+- **Errores de dominio** (`CopilotError`, lista cerrada de códigos): `path_outside_workspace`, `file_not_found`, `unsupported_format`, `analysis_failed`, `analysis_timeout`, `invalid_analysis_output`, y desde F2a los de Reaper: `daw_unavailable` (sin señal de vida reciente o puente no cargado), `daw_timeout`, `daw_busy` (render en curso), `daw_error` (fallo del puente sin código propio), `invalid_daw_output` (respuesta del puente fuera de su esquema), `item_not_found`, `track_not_found`, `preset_not_found`, `job_not_found`, `out_of_range` (corte fuera de la fuente, tasa fuera de [0,5, 2], valor fuera del rango del plugin o de un `knob`), `nothing_to_undo` y `render_failed`. El mensaje es fijo por código, sin rutas ni texto de Reaper; el detalle va al registro. El servidor MCP los devuelve con `isError: true` y el código al principio del mensaje. Hay además dos códigos de protocolo, fuera de la lista de dominio: `internal_error` (error inesperado o salida de una herramienta fuera de su esquema; antes esto último daba `invalid_analysis_output`), con el mensaje `internal_error: the tool failed unexpectedly`, e `invalid_input` (entrada que no cumple el esquema; mensaje fijo). El detalle de ambos solo va al registro (stderr).
 - **Adaptador** (`libs/adapters/analysis-py`): proceso hijo sin shell, tiempo límite de 120 s por defecto, stdout de 1 MB como máximo y stderr truncado a 8 KiB. La salida se valida con el esquema antes de devolverla.
 - **Rutas.** Relativas al workspace (`<repositorio>/workspace` por defecto, ignorado por git y que hay que crear; se cambia con `COPILOT_WORKSPACE`) o absolutas dentro de él. Se comprueba de forma léxica y otra vez tras `realpath`; extensiones admitidas: `.wav .flac .mp3 .aiff .ogg`.
-- **Servidor MCP** (`apps/mcp-server`, stdio). Variables: `MODE` (`mentor` por defecto; un valor inválido hace fallar el arranque), `COPILOT_WORKSPACE` y `COPILOT_PYTHON` (por defecto `python/analysis/.venv/bin/python`). El `.mcp.json` de la raíz lo registra con `MODE=agent`. `pnpm mcp:call <herramienta> '<json>'` llama a una herramienta desde la terminal. `COPILOT_DATA_DIR` fija dónde se guarda la base SQLite (sección 9.3). `pnpm mcp:traces [n]` imprime las últimas `n` trazas. Medido: `analyze_audio` tarda 1,7 s la primera vez (casi todo arranque de librosa) y 0,2 s desde la caché; `compare_audio`, 7,8 s frente a 0,25 s.
+- **Servidor MCP** (`apps/mcp-server`, stdio). Variables: `MODE` (`mentor` por defecto; un valor inválido hace fallar el arranque), `COPILOT_WORKSPACE` y `COPILOT_PYTHON` (por defecto `python/analysis/.venv/bin/python`); las de Reaper en la sección 8.2. El `.mcp.json` de la raíz lo registra con `MODE=mentor`; para `agent` se registra en ámbito local: `claude mcp add --scope local reaper-copilot -e MODE=agent -- node apps/mcp-server/src/main.ts`. `pnpm mcp:call <herramienta> '<json>'` llama a una herramienta desde la terminal. `COPILOT_DATA_DIR` fija dónde se guarda la base SQLite (sección 9.3). `pnpm mcp:traces [n]` imprime las últimas `n` trazas. Medido: `analyze_audio` tarda 1,7 s la primera vez (casi todo arranque de librosa) y 0,2 s desde la caché; `compare_audio`, 7,8 s frente a 0,25 s.
 - **Método de tempo.** `librosa.feature.tempo` no se usa como medida final: sin pista cae a la mitad entre 180 y 210 BPM, y su resolución no permite afinar a ±1 BPM. El tempo se obtiene con una búsqueda fina (pasos de 0,05 BPM) sobre la autocorrelación de la envolvente de ataques, calculada con librosa y `hop_length=64`, puntuando cada candidato a 1, 2, 4 y 8 tiempos.
 - **Rango de búsqueda.** Con tempo objetivo `t`, se busca en una octava centrada en él, `[t/√2, t·√2]`: el objetivo elige la octava (el tempo, su mitad o su doble) pero no arrastra la medida. Sin objetivo, el rango del género (140-230 BPM). En ambos casos se devuelven las alternativas mitad y doble. Motivo: con ±4 % alrededor del objetivo, un tema a 160 con objetivo 190 salía a 182,9 (descubierto al usar F1a); `tempo.target.matches` dice si la medida coincide con el objetivo.
 - **`tempo.confidence` es la puntuación de esa búsqueda** (0 a 1). Por debajo de 0,10 el tempo no se considera medible y el criterio de BPM devuelve `unmeasured` (sección 9.2). Umbral provisional.
@@ -296,22 +297,24 @@ En modo `mentor` solo se exponen las de lectura.
 ### 8.2 TypeScript con Reaper
 
 - Un script `bridge.lua` corre dentro de Reaper y sondea con `reaper.defer`.
-- IPC por archivos en el workspace: `inbox/` (peticiones) y `outbox/` (respuestas), con escritura atómica (archivo temporal y renombrado).
+- IPC por archivos en `<repositorio>/.copilot/reaper-ipc/` (`COPILOT_REAPER_IPC` lo cambia): `inbox/` (peticiones) y `outbox/` (respuestas), con escritura atómica (archivo temporal y renombrado). El puente localiza la carpeta relativa a su propia ruta (`reaper/bridge/../../.copilot/reaper-ipc`), porque Reaper no ve las variables de entorno de WSL. No va en el workspace: mezclaría datos internos con el audio del usuario.
 - Petición: `{ id, method, params, schemaVersion }`. Respuesta: `{ id, ok, result | error }`.
 - Lista cerrada de métodos, validados a ambos lados. Cada método mutante se envuelve en un bloque de deshacer.
-- Un solo cliente y una sola instancia de Reaper a la vez: el archivo de bloqueo identifica a ambos. Los nombres de archivo en `inbox/` y `outbox/` son únicos, porque en Windows el renombrado no sobrescribe.
+- Bloqueo solo en el puente, una instancia por `inbox/`: al arrancar, si hay un `heartbeat.json` reciente de otra instancia, el puente no arranca. No hay bloqueo del cliente: `pnpm mcp:call` y la sesión de Claude Code pueden convivir, y los ids únicos evitan respuestas cruzadas. Los nombres de archivo en `inbox/` y `outbox/` son únicos, porque en Windows el renombrado no sobrescribe.
+- **Señal de vida.** El puente reescribe `heartbeat.json` (`{ state: "idle" | "rendering", instance }`) cada medio segundo y justo antes de renderizar. Si su `mtime` supera 3 s y el estado no es `rendering`, el adaptador responde `daw_unavailable` sin esperar al tiempo límite (10 s por comando, 300 s para el render).
 - **Dónde corre Reaper.** En desarrollo, Reaper es nativo de Windows y el resto (servidor MCP, Node, Python) corre en WSL; la interfaz de Reaper por WSLg no es usable. En el servidor, Reaper para Linux comparte sistema de archivos con el backend.
 - **El workspace y el IPC viven en el sistema de archivos de Linux.** En desarrollo, Reaper los alcanza por `\\wsl.localhost\<distribución>\...`.
-- **Traducción de rutas en el adaptador de Reaper**, en los dos sentidos: de Linux a UNC en lo que envía y de UNC a Linux en lo que recibe. Es configuración del adaptador; en el servidor es la identidad. El núcleo y las herramientas solo ven rutas de Linux.
+- **Traducción de rutas en el adaptador de Reaper**, en los dos sentidos: de Linux a UNC en lo que envía y de UNC a Linux en lo que recibe (acepta `\\wsl.localhost\` y `\\wsl$\`, sin distinguir mayúsculas en el prefijo). Es configuración del adaptador: `COPILOT_REAPER_PATH_STYLE` vale `unc` (por defecto si existe `WSL_DISTRO_NAME`) o `identity` (si no; en el servidor); un valor inválido hace fallar el arranque. Una fuente que no traduce a Linux se devuelve como `source: null`; una ruta recibida no traducible es `invalid_daw_output`. El núcleo y las herramientas solo ven rutas de Linux.
 - **El puente no se fía de los valores de retorno de Reaper.** Antes de importar comprueba que el archivo existe, y después que el item tiene duración mayor que cero: una ruta sin traducir crea un item vacío sin dar error.
-- **El render es síncrono dentro del puente:** mientras renderiza no atiende nada. El trabajo asíncrono (`jobId`, `get_job_status`) vive en el adaptador, que espera la respuesta y contesta el estado sin preguntar a Reaper. La señal de vida del puente indica cuándo está renderizando, porque un latido se congela.
-- **Carga del puente.** En desarrollo, `reaper.exe -nonewinst bridge.lua` lo carga en el Reaper ya abierto. En Linux eso arranca otra instancia: en el servidor el puente se pasa como argumento al arrancar Reaper.
+- **El render es síncrono dentro del puente:** mientras renderiza no atiende nada. El trabajo asíncrono (`jobId`, `get_job_status`) vive en memoria del adaptador, que espera la respuesta y contesta el estado sin preguntar a Reaper; con `pnpm mcp:call`, que arranca un servidor por llamada, no se puede consultar un render de otra llamada. Mientras hay un render en curso, cualquier otro comando falla con `daw_busy` (no se encolan). La señal de vida del puente indica cuándo está renderizando, porque un latido se congela. Se trabaja en la pestaña de proyecto activa.
+- **Carga del puente.** En desarrollo, `pnpm reaper:bridge` carga `reaper/bridge/bridge.lua` en el Reaper abierto con `reaper.exe -nonewinst` y su ruta UNC (`COPILOT_REAPER_EXE` cambia el ejecutable). Lanzar `-nonewinst` con el puente corriendo lo detiene (conmutador): por eso el script envía `quit` si hay un puente vivo y vuelve a cargarlo. En Linux eso arranca otra instancia: en el servidor el puente se pasa como argumento al arrancar Reaper.
 - **Detalles de ReaScript:** el listado de `reaper.EnumerateFiles` se refresca con índice `-1` en cada ciclo, y el JSON se codifica dentro de `bridge.lua` (Lua no lo trae).
 - **Operaciones** (spike `reaper-ops`):
   - **Corte:** desplazamiento de la toma (`D_STARTOFFS`, `D_LENGTH`), no división, que añade un fundido. Parámetros explícitos `sourceBpm`, `offsetSec` (por defecto 0: el primer tiempo está al principio), `startBar`, `bars` y `beatsPerBar`. Sin detección del primer tiempo.
   - **Estirado:** tasa de reproducción con el tono conservado. Al importar, el puente pone el item en timebase de tiempo (`C_BEATATTACHMODE` = 0): con el valor del proyecto, un cambio de tempo vuelve a estirar el item.
   - **Parámetros de FX:** los VST de Cockos reciben valores normalizados y los JS unidades reales. Los presets se expresan por nombre de parámetro y valor mostrado (dB, Hz, %); el puente busca el valor normalizado por bisección sobre `TrackFX_FormatParamValueNormalized`.
-  - **Render:** WAV de la selección de tiempo igual a los límites del item, con nombre único por trabajo; el puente se niega si el archivo existe, porque Reaper abriría un diálogo modal y bloquearía el puente.
+  - **Render:** WAV de la mezcla del master en la selección de tiempo igual a los límites del item, con nombre único por trabajo (`workspace/renders/<UTC>-<hex>.wav`); el puente se niega si el archivo existe (`output_exists`), porque Reaper abriría un diálogo modal y bloquearía el puente. Va en su propio bloque «Copilot: render»: el primer `undo_last` tras renderizar deshace ese bloque, sin cambio visible. `durationSec` sale de la cabecera del WAV. El render no restaura la selección de items ni los ajustes `RENDER_*` del proyecto.
+  - **Deshacer:** cada método mutante va en un bloque `Copilot: <acción>`; `undo` solo actúa si el último bloque lleva esa etiqueta.
   - **Medio fuera de línea:** con la preferencia «Set media offline when application is not active», el render sale en silencio. Antes de renderizar, el puente pone el medio en línea y comprueba que la fuente tiene longitud.
 - Origen de estas decisiones: `specs/spikes/reaper-bridge-wsl.md`, `specs/spikes/reaper-bridge-windows.md` y `specs/spikes/reaper-ops.md`.
 
@@ -576,7 +579,7 @@ El spike de Reaper sin pantalla puede adelantarse a la fase 0 si el portátil es
 4. Idioma del README y de la interfaz del Replay.
 5. Qué muestras preinstaladas usar en Live y Replay (propias o con licencia libre).
 6. Modelo de Claude para el modo Live y límites concretos por visitante.
-7. Nombres y parámetros finales de los presets de FX para hardstyle y hardcore.
+7. Nombres y parámetros finales de los presets de FX para hardstyle y hardcore. En F2a hay tres presets provisionales (`distortion_hard`, `limiter_loud`, `eq_lowcut`) para probar el mecanismo; sus rangos y valores no son definitivos.
 8. Licencia de la documentación de Reaper: si permite ofrecer la búsqueda en el modo Live público.
 9. Modelo de embeddings local y extensión vectorial de SQLite para la búsqueda en documentación.
 10. Umbral de confianza para `unmeasured` (0,10, provisional): sale de 36 fragmentos de temas masterizados, con poco margen. Revisarlo con loops sueltos, breaks sin bombo y audio estirado por Reaper, y también con la ventana de una octava. La tolerancia de ±1 BPM queda confirmada; la de ±20 ms de duración, sin probar.

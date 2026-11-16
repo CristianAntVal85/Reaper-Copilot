@@ -29,13 +29,15 @@ En caso de duda entre dos vías, elige la más ligera y sube si el cambio crece.
 - `pnpm py:setup`: crea `python/analysis/.venv` e instala el paquete. Se ejecuta una vez, antes de `pnpm check:full`.
 - `pnpm mcp:call <herramienta> '<json>'`: llama a una herramienta del servidor MCP por stdio, sin Claude Code.
 - `pnpm mcp:traces [n]`: imprime las últimas `n` trazas de llamadas a herramientas (SQLite).
-- `pnpm test:reaper`: integración con Reaper real. Solo en local, con Reaper abierto. Llega en la fase 2.
+- `pnpm reaper:bridge`: carga `reaper/bridge/bridge.lua` en el Reaper de Windows abierto (`-nonewinst`); si el puente ya corre, hace `quit` y lo recarga. Hay que ejecutarlo antes de usar las herramientas de Reaper.
+- `pnpm test:reaper`: integración con Reaper real. Solo en local, con Reaper abierto y el puente cargado.
 
 ## Servidor MCP
 
-- Se registra con `.mcp.json` en la raíz (`reaper-copilot`, `MODE=agent`). Claude Code pide aprobarlo la primera vez; `claude mcp list` lo comprueba.
+- Se registra con `.mcp.json` en la raíz (`reaper-copilot`, `MODE=mentor`: solo herramientas de lectura). Claude Code pide aprobarlo la primera vez; `claude mcp list` lo comprueba.
+- Para `agent` (las que modifican Reaper), regístralo en ámbito local: `claude mcp add --scope local reaper-copilot -e MODE=agent -- node apps/mcp-server/src/main.ts`.
 - Las rutas de audio van relativas a `workspace/` (ignorado por git, hay que crearlo) o absolutas dentro de él. `COPILOT_WORKSPACE` lo cambia; `MODE` por defecto es `mentor`.
-- Trazas y caché de análisis en SQLite: `<repositorio>/.copilot/copilot.db` (ignorado por git); `COPILOT_DATA_DIR` cambia la carpeta. Al cambiar el método de análisis de Python, sube `ANALYSIS_REVISION` (`libs/core`) o borra `.copilot/`: si no, la caché devuelve análisis antiguos.
+- Trazas y caché de análisis en SQLite: `<repositorio>/.copilot/copilot.db` (ignorado por git); `COPILOT_DATA_DIR` cambia la carpeta. Variables de Reaper: `COPILOT_REAPER_IPC` (carpeta del IPC, por defecto `<repositorio>/.copilot/reaper-ipc`), `COPILOT_REAPER_PATH_STYLE` (`unc` o `identity`), `COPILOT_PRESETS` (por defecto `reaper/presets`) y `COPILOT_REAPER_EXE` (solo para `reaper:bridge`). Al cambiar el método de análisis de Python, sube `ANALYSIS_REVISION` (`libs/core`) o borra `.copilot/`: si no, la caché devuelve análisis antiguos.
 
 ## Estructura
 
