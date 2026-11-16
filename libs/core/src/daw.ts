@@ -118,6 +118,17 @@ export const KnobSchema = z
   });
 export type Knob = z.infer<typeof KnobSchema>;
 
+/**
+ * Closed list of plugins the copilot may load. Single source of truth in TypeScript; reaper/bridge/bridge.lua
+ * repeats it (FX_ALLOWED) and must be kept in sync.
+ */
+export const ALLOWED_FX_PLUGINS = [
+  "JS: Waveshaping Distortion",
+  "ReaLimit (Cockos)",
+  "ReaEQ (Cockos)",
+  "ReaComp (Cockos)",
+] as const;
+
 const PresetParamSchema = z.union([
   z.strictObject({ knob: knobName }),
   z.strictObject({ value: finite }),

@@ -119,6 +119,16 @@ describe("ReaperDaw", () => {
     expect((error as CopilotError).message).not.toContain("secret");
   });
 
+  it("translates fx_not_allowed to daw_error and path_outside_workspace to its domain code", async () => {
+    handler = () => ({ ok: false, error: { code: "fx_not_allowed", message: "x" } });
+    await bridge.start();
+    expect(await code(daw().getProjectState())).toBe("daw_error");
+    handler = () => ({ ok: false, error: { code: "path_outside_workspace", message: secret } });
+    const error = await daw().getProjectState().catch((e: unknown) => e as CopilotError);
+    expect((error as CopilotError).code).toBe("path_outside_workspace");
+    expect((error as CopilotError).message).not.toContain("secret");
+  });
+
   it("maps an unknown bridge code to daw_error", async () => {
     handler = () => ({ ok: false, error: { code: "weird" } });
     await bridge.start();

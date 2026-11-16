@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
+import path from "node:path";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { PythonAnalyzer } from "@reaper-copilot/adapter-analysis-py";
 import { ReaperDaw } from "@reaper-copilot/adapter-reaper";
 import { SqliteStorage } from "@reaper-copilot/adapter-storage-sqlite";
 import { ALL_TOOLS, createToolRegistry, loadPresets } from "@reaper-copilot/tools";
-import { databasePath, readConfig } from "./config.ts";
+import { DEFAULT_WORKSPACE, databasePath, readConfig } from "./config.ts";
 import { createServer } from "./server.ts";
 
 const config = readConfig(process.env);
@@ -16,6 +17,11 @@ const log = (message: string): void => console.error(`[reaper-copilot] ${message
 // An invalid preset stops the start; Reaper being closed does not (the tools answer daw_unavailable).
 const presets = await loadPresets(config.presetsDir);
 const daw = new ReaperDaw({ ipcDir: config.reaperIpcDir, pathStyle: config.reaperPathStyle, log });
+if (path.resolve(config.workspaceRoot) !== path.resolve(DEFAULT_WORKSPACE)) {
+  log(
+    `warning: COPILOT_WORKSPACE (${config.workspaceRoot}) differs from ${DEFAULT_WORKSPACE}; the Reaper bridge only accepts paths under the latter`,
+  );
+}
 const registry = createToolRegistry(ALL_TOOLS, config.mode);
 const server = createServer({
   registry,

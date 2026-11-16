@@ -42,6 +42,11 @@ describe("loadPresets", () => {
     await expect(loadPresets(await dirWith({ "demo.json": { ...valid, knobs: {} } }))).rejects.toThrow(/demo\.json/);
   });
 
+  it("fails on a plugin outside the allowed list", async () => {
+    const bad = { ...valid, fx: [{ plugin: "C:\\evil\\x.dll", params: { Threshold: { knob: "t" } } }] };
+    await expect(loadPresets(await dirWith({ "demo.json": bad }))).rejects.toThrow(/demo\.json/);
+  });
+
   it("fails when the id differs from the file name", async () => {
     await expect(loadPresets(await dirWith({ "other.json": valid }))).rejects.toThrow(/other\.json/);
   });

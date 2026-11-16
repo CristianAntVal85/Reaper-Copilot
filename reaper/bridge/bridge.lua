@@ -17,6 +17,8 @@ local IPC = repo .. SEP .. ".copilot" .. SEP .. "reaper-ipc"
 local INBOX = IPC .. SEP .. "inbox"
 local OUTBOX = IPC .. SEP .. "outbox"
 local HEARTBEAT = IPC .. SEP .. "heartbeat.json"
+-- The bridge defends itself: it only touches paths under <repo>/workspace, whatever the server sends.
+local WORKSPACE = repo .. SEP .. "workspace"
 
 reaper.RecursiveCreateDirectory(INBOX, 0)
 reaper.RecursiveCreateDirectory(OUTBOX, 0)
@@ -160,7 +162,7 @@ local CODES = {
   bad_request = true, unknown_method = true, invalid_params = true, file_not_found = true,
   item_not_found = true, track_not_found = true, fx_not_found = true, param_not_found = true,
   out_of_range = true, output_exists = true, media_offline = true, render_failed = true,
-  nothing_to_undo = true, internal = true,
+  nothing_to_undo = true, internal = true, fx_not_allowed = true, path_outside_workspace = true,
 }
 
 local function fail(code, message)
@@ -242,6 +244,32 @@ function methods.get_project_state()
   }
 end
 
+-- Closed list of plugins. Duplicate of ALLOWED_FX_PLUGINS in libs/core/src/daw.ts (the source of truth):
+-- keep both in sync. Exact names only; anything else (paths, .dll, .vst3) is refused.
+local FX_ALLOWED = {
+  ["JS: Waveshaping Distortion"] = true,
+  ["ReaLimit (Cockos)"] = true,
+  ["ReaEQ (Cockos)"] = true,
+  ["ReaComp (Cockos)"] = true,
+}
+
+-- Lower case, one separator kind, no repeated separators: Windows and UNC paths compare equal.
+local function normalize_path(p)
+  return (p:gsub("\\", "/"):gsub("/+", "/"):lower())
+end
+
+-- Refuses any path that is not under the workspace or that has `..` segments.
+local function require_in_workspace(path)
+  local norm = normalize_path(path)
+  for segment in norm:gmatch("[^/]+") do
+    if segment == ".." then fail("path_outside_workspace", "path has .. segments") end
+  end
+  local root = normalize_path(WORKSPACE):gsub("/$", "")
+  if norm:sub(1, #root + 1) ~= root .. "/" then
+    fail("path_outside_workspace", "path is outside the workspace")
+  end
+end
+
 -- Runs `fn` as one undo block labelled "Copilot: <action>"; the block is closed even if `fn` fails.
 local function undoable(action, fn)
   reaper.Undo_BeginBlock()
@@ -259,6 +287,7 @@ end
 function methods.import_audio(params)
   local path = params.path
   if type(path) ~= "string" or path == "" then fail("invalid_params", "path must be a non-empty string") end
+  require_in_workspace(path)
   -- Without this check a path Reaper cannot read becomes an empty item and no error.
   if not reaper.file_exists(path) then fail("file_not_found", "file does not exist") end
   return undoable("import_audio", function()
@@ -430,6 +459,7 @@ function methods.apply_fx_chain(params)
     if type(entry) ~= "table" or type(entry.plugin) ~= "string" or type(entry.params) ~= "table" then
       fail("invalid_params", "each chain entry needs plugin and params")
     end
+    if not FX_ALLOWED[entry.plugin] then fail("fx_not_allowed", "plugin is not in the allowed list") end
     for _, p in ipairs(entry.params) do
       if type(p) ~= "table" or type(p.name) ~= "string" or type(p.value) ~= "number" then
         fail("invalid_params", "each parameter needs a name and a numeric value")
@@ -473,6 +503,7 @@ function methods.render(params)
   if type(out) ~= "string" or out == "" then fail("invalid_params", "path must be a non-empty string") end
   local dir, name = out:match("^(.*)[/\\]([^/\\]+)%.[wW][aA][vV]$")
   if not dir or dir == "" or name == "" then fail("invalid_params", "path must name a .wav file") end
+  require_in_workspace(out)
   local item, take = find_item(params.itemId)
   if reaper.file_exists(out) then fail("output_exists", "the output file already exists") end
 

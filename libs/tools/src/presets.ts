@@ -1,6 +1,6 @@
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
-import { type Preset, PresetSchema } from "@reaper-copilot/core";
+import { ALLOWED_FX_PLUGINS, type Preset, PresetSchema } from "@reaper-copilot/core";
 
 /** Loads every `*.json` preset in `dir`. Any invalid file (or an id that differs from its file name) fails the load. */
 export async function loadPresets(dir: string): Promise<Preset[]> {
@@ -25,6 +25,11 @@ export async function loadPresets(dir: string): Promise<Preset[]> {
     if (!parsed.success) return fail(parsed.error);
     if (parsed.data.id !== name.slice(0, -".json".length)) {
       return fail(new Error(`id "${parsed.data.id}" does not match the file name`));
+    }
+    for (const fx of parsed.data.fx) {
+      if (!(ALLOWED_FX_PLUGINS as readonly string[]).includes(fx.plugin)) {
+        return fail(new Error(`plugin "${fx.plugin}" is not in the allowed list`));
+      }
     }
     presets.push(parsed.data);
   }

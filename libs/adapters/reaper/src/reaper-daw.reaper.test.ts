@@ -57,6 +57,7 @@ function clickTrack(bpm: number, bars: number, leadSec: number, sampleRate = 220
 
 let tmp: string | undefined;
 
+
 async function waitForJob(jobId: string): Promise<JobStatus> {
   const deadline = Date.now() + 60_000;
   for (;;) {
@@ -256,6 +257,40 @@ describe("Reaper bridge (real)", () => {
     } finally {
       await restore(before.tracks.map((t) => t.id));
       await rm(output, { force: true });
+    }
+  });
+  it("refuses plugins outside the closed list and paths outside the workspace", async () => {
+    await mkdir(WORKSPACE, { recursive: true });
+    tmp ??= await mkdtemp(path.join(WORKSPACE, "test-reaper-"));
+    const file = path.join(tmp, "guard.wav");
+    await writeFile(file, wav(1));
+    const before = await daw.getProjectState();
+    try {
+      const { track, item } = await daw.importAudio(asAssetPath(file));
+      for (const plugin of ["ReaGate (Cockos)", "C:\\Windows\\evil.dll", "/usr/lib/x.vst3", "reaeq (cockos)", "ReaEQ (Cockos).vst3"]) {
+        const refused = await daw.applyFxChain(track.id, [{ plugin, params: [] }]).catch((e: unknown) => e);
+        expect(refused).toBeInstanceOf(CopilotError);
+        expect(refused).toMatchObject({ code: "daw_error" });
+      }
+      expect((await daw.getProjectState()).tracks.at(-1)?.fx).toEqual([]);
+
+      const outside = [
+        "/tmp/outside.wav",
+        path.join(WORKSPACE, "..", "outside.wav"),
+        `${tmp}/sub/../../../outside.wav`,
+        `${WORKSPACE}-evil/outside.wav`,
+      ];
+      for (const bad of outside) {
+        const imported = await daw.importAudio(asAssetPath(bad)).catch((e: unknown) => e);
+        expect(imported).toMatchObject({ code: "path_outside_workspace" });
+      }
+      const dotted = await daw.importAudio(asAssetPath(`${tmp}/sub/../guard.wav`)).catch((e: unknown) => e);
+      expect(dotted).toMatchObject({ code: "path_outside_workspace" });
+      const job = await waitForJob(await daw.render(item.id, asAssetPath("/tmp/rca-outside-render.wav")));
+      expect(job).toMatchObject({ status: "failed", errorCode: "path_outside_workspace" });
+      expect((await daw.getProjectState()).tracks.length).toBe(before.tracks.length + 1);
+    } finally {
+      await restore(before.tracks.map((t) => t.id));
     }
   });
 });
