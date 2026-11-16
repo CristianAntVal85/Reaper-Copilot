@@ -4,7 +4,7 @@ import { z } from "zod";
 /** Version of the request envelope; the bridge refuses any other. */
 export const BRIDGE_PROTOCOL_VERSION = 1;
 
-export const BRIDGE_METHODS = ["ping", "get_project_state", "import_audio", "set_tempo", "slice", "stretch", "apply_fx_chain", "undo", "quit"] as const;
+export const BRIDGE_METHODS = ["ping", "get_project_state", "import_audio", "set_tempo", "slice", "stretch", "apply_fx_chain", "render", "undo", "quit"] as const;
 export type BridgeMethod = (typeof BRIDGE_METHODS)[number];
 
 export const BRIDGE_ERROR_CODES = [
@@ -64,6 +64,9 @@ export const BridgeItemResultSchema = BridgeItemSchema;
 export const SetTempoResultSchema = z.object({ tempo: z.number().finite().positive() });
 export const UndoResultSchema = z.object({ undone: z.string().min(1) });
 
+/** Render result: the bounds of the rendered item, used when the WAV header cannot be read. */
+export const BridgeRenderResultSchema = z.object({ lengthSec: z.number().finite().positive() });
+
 export const QuitResultSchema = z.object({ bye: z.literal(true) });
 
 /** Project state as Reaper reports it: item sources are still Windows paths (or null). */
@@ -97,15 +100,25 @@ const TRANSLATION: Record<BridgeErrorCode, { code: CopilotErrorCode; message: st
   param_not_found: { code: "daw_error", message: "the plugin has no such parameter" },
   out_of_range: { code: "out_of_range", message: "the value is outside the allowed range" },
   output_exists: { code: "render_failed", message: "the render output already exists" },
-  media_offline: { code: "render_failed", message: "the item's media is offline" },
+  media_offline: { code: "daw_error", message: "the item's media is offline" },
   render_failed: { code: "render_failed", message: "Reaper could not render the item" },
   nothing_to_undo: { code: "nothing_to_undo", message: "there is nothing of the copilot's to undo" },
   internal: { code: "daw_error", message: "the Reaper bridge failed unexpectedly" },
 };
 
-export function translateBridgeError(error: { code: string; message?: string | undefined }): CopilotError {
-  const known = (BRIDGE_ERROR_CODES as readonly string[]).includes(error.code)
-    ? TRANSLATION[error.code as BridgeErrorCode]
+/** Codes that mean a failed render only when they come from the `render` method. */
+const RENDER_ONLY: Partial<Record<BridgeErrorCode, { code: CopilotErrorCode; message: string }>> = {
+  media_offline: { code: "render_failed", message: "the item's media is offline" },
+};
+
+export function translateBridgeError(
+  error: { code: string; message?: string | undefined },
+  method?: BridgeMethod,
+): CopilotError {
+  const isKnown = (BRIDGE_ERROR_CODES as readonly string[]).includes(error.code);
+  const known = isKnown
+    ? ((method === "render" ? RENDER_ONLY[error.code as BridgeErrorCode] : undefined) ??
+      TRANSLATION[error.code as BridgeErrorCode])
     : { code: "daw_error" as const, message: "the Reaper bridge reported an unknown error" };
   return new CopilotError(known.code, known.message, {
     cause: new Error(`bridge ${error.code}: ${error.message ?? ""}`),

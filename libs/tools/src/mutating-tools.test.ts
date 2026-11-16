@@ -1,10 +1,12 @@
-import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { CopilotError } from "@reaper-copilot/core";
 import { FakeAnalyzer, FakeDaw, FakeStorage } from "@reaper-copilot/testing";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { getJobStatus } from "./get-job-status.ts";
 import { importAudio } from "./import-audio.ts";
+import { renderSelection } from "./render-selection.ts";
 import { setTempo } from "./set-tempo.ts";
 import { sliceLoop } from "./slice-loop.ts";
 import { timeStretch } from "./time-stretch.ts";
@@ -136,5 +138,57 @@ describe("slice_loop and time_stretch", () => {
     await expect(timeStretch.handler({ itemId: id, sourceBpm: 150, targetBpm: 170 }, context())).rejects.toMatchObject({
       code: "daw_unavailable",
     });
+  });
+});
+
+describe("render_selection and get_job_status", () => {
+  it("renders to a generated name in workspace/renders and reports a relative path", async () => {
+    const daw = new FakeDaw();
+    daw.defaultSourceLengthSec = 30;
+    const { item } = await importAudio.handler({ path: "demo/loop.wav" }, context(daw));
+    const { jobId } = await renderSelection.handler({ itemId: item.id }, context(daw));
+
+    const rendering = await getJobStatus.handler({ jobId }, context(daw));
+    expect(rendering).toMatchObject({ status: "rendering", output: null });
+    const call = daw.calls.find((c) => c.method === "render");
+    const output = String(call?.args[1]);
+    expect(path.dirname(output)).toBe(path.join(ws, "renders"));
+    expect(path.basename(output)).toMatch(/^\d{8}-\d{6}-[0-9a-f]{8}\.wav$/);
+
+    await expect(setTempo.handler({ bpm: 160 }, context(daw))).rejects.toMatchObject({ code: "daw_busy" });
+    daw.completeJob(jobId);
+    const done = getJobStatus.outputSchema.parse(await getJobStatus.handler({ jobId }, context(daw)));
+    expect(done).toMatchObject({ status: "done", output: { path: `renders/${path.basename(output)}`, durationSec: 30 } });
+    expect(JSON.stringify(done)).not.toContain(ws);
+  });
+
+  it("reports failures and unknown jobs, and both need a DAW", async () => {
+    const daw = new FakeDaw();
+    const { item } = await importAudio.handler({ path: "demo/loop.wav" }, context(daw));
+    const { jobId } = await renderSelection.handler({ itemId: item.id }, context(daw));
+    daw.failJob(jobId, "render_failed");
+    expect(await getJobStatus.handler({ jobId }, context(daw))).toMatchObject({ status: "failed", errorCode: "render_failed" });
+    await expect(getJobStatus.handler({ jobId: "nope" }, context(daw))).rejects.toMatchObject({ code: "job_not_found" });
+    await expect(renderSelection.handler({ itemId: item.id }, context())).rejects.toMatchObject({ code: "daw_unavailable" });
+    await expect(getJobStatus.handler({ jobId }, context())).rejects.toMatchObject({ code: "daw_unavailable" });
+    expect(renderSelection.risk).toBe("write");
+    expect(getJobStatus.risk).toBe("read");
+  });
+
+  it("refuses a renders directory that points outside the workspace", async () => {
+    const outside = await mkdtemp(path.join(tmpdir(), "rca-out-"));
+    const ws2 = await realpath(await mkdtemp(path.join(tmpdir(), "rca-ws2-")));
+    try {
+      await symlink(outside, path.join(ws2, "renders"));
+      const daw = new FakeDaw();
+      const ctx = { ...context(daw), workspaceRoot: ws2 };
+      await expect(renderSelection.handler({ itemId: "{AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE}" }, ctx)).rejects.toMatchObject({
+        code: "path_outside_workspace",
+      });
+      expect(daw.calls).toEqual([]);
+    } finally {
+      await rm(outside, { recursive: true, force: true });
+      await rm(ws2, { recursive: true, force: true });
+    }
   });
 });

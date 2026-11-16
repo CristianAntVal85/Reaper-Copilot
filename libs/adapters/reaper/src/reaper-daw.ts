@@ -22,11 +22,13 @@ import {
 } from "@reaper-copilot/core";
 import type { z } from "zod";
 import { fromDawPath, toDawPath, type PathOptions, type PathStyle } from "./paths.ts";
+import { readWavDuration } from "./wav.ts";
 import {
   BRIDGE_PROTOCOL_VERSION,
   BridgeImportResultSchema,
   BridgeItemResultSchema,
   BridgeProjectStateSchema,
+  BridgeRenderResultSchema,
   HeartbeatSchema,
   PingResultSchema,
   QuitResultSchema,
@@ -59,10 +61,6 @@ const POLL_MS = 15;
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
 export const DEFAULT_IPC_DIR = path.join(REPO_ROOT, ".copilot", "reaper-ipc");
 
-function notImplemented(method: string): CopilotError {
-  return new CopilotError("daw_error", `${method} is not implemented yet`);
-}
-
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -78,9 +76,13 @@ export class ReaperDaw implements DawPort {
   private readonly heartbeatFile: string;
   private readonly pathOptions: PathOptions;
   private readonly timeoutMs: number;
+  private readonly renderTimeoutMs: number;
   private readonly heartbeatMaxAgeMs: number;
   private readonly log: (message: string) => void;
   private dirsReady = false;
+  private readonly jobs = new Map<string, JobStatus>();
+  /** Id of the render in flight, if any: the bridge serves nothing else meanwhile. */
+  private activeRender: string | null = null;
 
   constructor(options: ReaperDawOptions) {
     const ipcDir = options.ipcDir ?? DEFAULT_IPC_DIR;
@@ -93,6 +95,7 @@ export class ReaperDaw implements DawPort {
     }
     this.pathOptions = distro === undefined ? { style: options.pathStyle } : { style: options.pathStyle, distro };
     this.timeoutMs = options.timeoutMs ?? 10_000;
+    this.renderTimeoutMs = options.renderTimeoutMs ?? 300_000;
     this.heartbeatMaxAgeMs = options.heartbeatMaxAgeMs ?? 3_000;
     this.log = options.log ?? (() => {});
   }
@@ -158,13 +161,57 @@ export class ReaperDaw implements DawPort {
     return this.call("apply_fx_chain", { trackId, chain }, AppliedFxChainSchema);
   }
 
-  // Not bridged yet (T6).
-  render(): Promise<JobId> {
-    return Promise.reject(notImplemented("render"));
+  /** Starts a render and returns its job id at once; `getJob` reports how it ends. */
+  async render(itemId: ItemId, output: AssetPath): Promise<JobId> {
+    if (this.activeRender !== null) throw this.busy();
+    const dawPath = toDawPath(output, this.pathOptions);
+    if (dawPath === null) {
+      throw new CopilotError("daw_error", "the output path cannot be mapped for Reaper", {
+        cause: new Error(`cannot translate ${output}`),
+      });
+    }
+    if (!(await this.bridgeAlive())) throw this.unavailable();
+    // Re-check: another render may have started while the heartbeat was read.
+    if (this.activeRender !== null) throw this.busy();
+
+    const jobId = randomUUID();
+    this.activeRender = jobId;
+    this.jobs.set(jobId, { jobId, status: "rendering", output: null, errorCode: null });
+    void this.runRender(jobId, itemId, dawPath, output);
+    return jobId;
   }
-  getJob(): Promise<JobStatus> {
-    return Promise.reject(notImplemented("getJob"));
+
+  async getJob(jobId: JobId): Promise<JobStatus> {
+    const job = this.jobs.get(jobId);
+    if (!job) throw new CopilotError("job_not_found", "no render job with that id");
+    return job;
   }
+
+  private async runRender(jobId: string, itemId: ItemId, dawPath: string, output: AssetPath): Promise<void> {
+    try {
+      const raw = await this.call(
+        "render",
+        { itemId, path: dawPath },
+        BridgeRenderResultSchema,
+        this.renderTimeoutMs,
+        true,
+      );
+      // The WAV header is the measure of what was written; the item's bounds are the fallback.
+      const durationSec = (await readWavDuration(output)) ?? raw.lengthSec;
+      this.jobs.set(jobId, { jobId, status: "done", output: { path: output, durationSec }, errorCode: null });
+    } catch (error) {
+      const errorCode = error instanceof CopilotError ? error.code : "daw_error";
+      this.log(`render ${jobId} failed: ${errorCode} ${error instanceof Error ? error.message : String(error)}`);
+      this.jobs.set(jobId, { jobId, status: "failed", output: null, errorCode });
+    } finally {
+      this.activeRender = null;
+    }
+  }
+
+  private busy(): CopilotError {
+    return new CopilotError("daw_busy", "a render is in progress: wait for it to finish (get_job_status)");
+  }
+
   async undo(): Promise<{ undone: string }> {
     return this.call("undo", {}, UndoResultSchema);
   }
@@ -204,7 +251,9 @@ export class ReaperDaw implements DawPort {
     params: Record<string, unknown>,
     schema: S,
     timeoutMs: number = this.timeoutMs,
+    isRender = false,
   ): Promise<z.output<S>> {
+    if (!isRender && this.activeRender !== null) throw this.busy();
     if (!(await this.bridgeAlive())) throw this.unavailable();
 
     if (!this.dirsReady) {
@@ -232,7 +281,7 @@ export class ReaperDaw implements DawPort {
         }
         if (text !== null) {
           await unlink(responseFile).catch(() => {});
-          return this.parseResponse(id, text, schema);
+          return this.parseResponse(id, method, text, schema);
         }
         const now = Date.now();
         if (now >= deadline) {
@@ -253,7 +302,7 @@ export class ReaperDaw implements DawPort {
     }
   }
 
-  private parseResponse<S extends z.ZodType>(id: string, text: string, schema: S): z.output<S> {
+  private parseResponse<S extends z.ZodType>(id: string, method: BridgeMethod, text: string, schema: S): z.output<S> {
     let json: unknown;
     try {
       json = JSON.parse(text);
@@ -270,7 +319,7 @@ export class ReaperDaw implements DawPort {
     }
     if (!envelope.data.ok) {
       this.log(`bridge error: ${envelope.data.error.code} ${envelope.data.error.message ?? ""}`);
-      throw translateBridgeError(envelope.data.error);
+      throw translateBridgeError(envelope.data.error, method);
     }
     const result = schema.safeParse(envelope.data.result);
     if (!result.success) {

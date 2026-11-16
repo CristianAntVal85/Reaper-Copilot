@@ -1,7 +1,7 @@
 import { mkdtemp, readdir, rm, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { asAssetPath, CopilotError } from "@reaper-copilot/core";
+import { asAssetPath, CopilotError, type JobStatus } from "@reaper-copilot/core";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { FakeBridge, type FakeBridgeHandler } from "./fake-bridge.ts";
 import { ReaperDaw } from "./reaper-daw.ts";
@@ -45,6 +45,33 @@ afterEach(async () => {
   bridge.stop();
   await rm(dir, { recursive: true, force: true });
 });
+
+function silentWav(seconds: number, sampleRate: number): Buffer {
+  const data = Buffer.alloc(seconds * sampleRate * 2);
+  const header = Buffer.alloc(44);
+  header.write("RIFF", 0);
+  header.writeUInt32LE(36 + data.length, 4);
+  header.write("WAVEfmt ", 8);
+  header.writeUInt32LE(16, 16);
+  header.writeUInt16LE(1, 20);
+  header.writeUInt16LE(1, 22);
+  header.writeUInt32LE(sampleRate, 24);
+  header.writeUInt32LE(sampleRate * 2, 28);
+  header.writeUInt16LE(2, 32);
+  header.writeUInt16LE(16, 34);
+  header.write("data", 36);
+  header.writeUInt32LE(data.length, 40);
+  return Buffer.concat([header, data]);
+}
+
+async function waitForJob(d: ReaperDaw, jobId: string): Promise<JobStatus> {
+  const deadline = Date.now() + 5000;
+  for (;;) {
+    const job = await d.getJob(jobId);
+    if (job.status !== "rendering" || Date.now() > deadline) return job;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+}
 
 async function code(promise: Promise<unknown>): Promise<string> {
   try {
@@ -164,8 +191,89 @@ describe("ReaperDaw", () => {
     }
   });
 
-  it("fails clearly on commands that are not bridged yet", async () => {
-    expect(await code(daw().render())).toBe("daw_error");
+  it("renders as an async job: busy meanwhile, then done with the WAV header's duration", async () => {
+    const out = path.join(dir, "out.wav");
+    const seen: { method: string; params: unknown }[] = [];
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    handler = async (method, params) => {
+      seen.push({ method, params });
+      if (method !== "render") return { ok: true, result: {} };
+      bridge.state = "rendering";
+      await gate;
+      await writeFile(out, silentWav(2, 8000));
+      bridge.state = "idle";
+      return { ok: true, result: { lengthSec: 9 } };
+    };
+    await bridge.start();
+    const d = daw();
+    const jobId = await d.render(ITEM, asAssetPath(out));
+    expect(await d.getJob(jobId)).toEqual({ jobId, status: "rendering", output: null, errorCode: null });
+    expect(await code(d.setTempo(170))).toBe("daw_busy");
+    expect(await code(d.getProjectState())).toBe("daw_busy");
+    expect(await code(d.render(ITEM, asAssetPath(path.join(dir, "other.wav"))))).toBe("daw_busy");
+    release();
+    const done = await waitForJob(d, jobId);
+    expect(done).toEqual({ jobId, status: "done", output: { path: out, durationSec: 2 }, errorCode: null });
+    expect(seen.map((s) => s.method)).toEqual(["render"]);
+    expect(seen[0]?.params).toEqual({
+      itemId: ITEM,
+      path: `\\\\wsl.localhost\\Ubuntu-24.04${out.replaceAll("/", "\\")}`,
+    });
+    // Free again afterwards.
+    handler = () => ({ ok: true, result: { tempo: 170 } });
+    expect(await d.setTempo(170)).toEqual({ tempo: 170 });
+    expect(await code(d.getJob("nope"))).toBe("job_not_found");
+  });
+
+  it("falls back to the item's length when the WAV cannot be read", async () => {
+    handler = () => ({ ok: true, result: { lengthSec: 5.5 } });
+    await bridge.start();
+    const d = daw();
+    const jobId = await d.render(ITEM, asAssetPath(path.join(dir, "missing.wav")));
+    expect(await waitForJob(d, jobId)).toMatchObject({ status: "done", output: { durationSec: 5.5 } });
+  });
+
+  it("fails the job with the translated code (output_exists, media_offline) and frees the bridge", async () => {
+    handler = () => ({ ok: false, error: { code: "output_exists", message: "x" } });
+    await bridge.start();
+    const d = daw();
+    const first = await d.render(ITEM, asAssetPath(path.join(dir, "a.wav")));
+    expect(await waitForJob(d, first)).toMatchObject({ status: "failed", errorCode: "render_failed", output: null });
+    handler = () => ({ ok: false, error: { code: "media_offline", message: "x" } });
+    const second = await d.render(ITEM, asAssetPath(path.join(dir, "b.wav")));
+    expect(await waitForJob(d, second)).toMatchObject({ status: "failed", errorCode: "render_failed" });
+    // Outside a render, media_offline is a plain bridge error.
+    expect(await code(d.sliceByBars(ITEM, { sourceBpm: 150, startBar: 1, bars: 1 }))).toBe("daw_error");
+  });
+
+  it("times out a render with renderTimeoutMs and fails the job", async () => {
+    handler = () => "silence";
+    await bridge.start();
+    const d = new ReaperDaw({ ipcDir: dir, pathStyle: "unc", distro: "Ubuntu-24.04", renderTimeoutMs: 200 });
+    const jobId = await d.render(ITEM, asAssetPath(path.join(dir, "slow.wav")));
+    expect(await waitForJob(d, jobId)).toMatchObject({ status: "failed", errorCode: "daw_timeout" });
+  });
+
+  it("does not give up on a render while the heartbeat is stale but says rendering", async () => {
+    handler = async () => {
+      const file = path.join(dir, "heartbeat.json");
+      await writeFile(file, JSON.stringify({ state: "rendering", instance: "x" }));
+      const old = new Date(Date.now() - 60_000);
+      await utimes(file, old, old);
+      await new Promise((resolve) => setTimeout(resolve, 1300));
+      return { ok: true, result: { lengthSec: 3 } };
+    };
+    await bridge.start({ heartbeat: false });
+    await bridge.beat();
+    const d = daw();
+    const jobId = await d.render(ITEM, asAssetPath(path.join(dir, "long.wav")));
+    expect(await waitForJob(d, jobId)).toMatchObject({ status: "done", output: { durationSec: 3 } });
+  });
+
+  it("refuses to start a render without a bridge", async () => {
+    await bridge.start({ heartbeat: false });
+    expect(await code(daw().render(ITEM, asAssetPath(path.join(dir, "x.wav"))))).toBe("daw_unavailable");
   });
 
   it("imports audio with the path translated to UNC and the source back to Linux", async () => {

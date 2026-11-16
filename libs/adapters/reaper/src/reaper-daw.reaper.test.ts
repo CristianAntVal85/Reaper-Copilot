@@ -1,9 +1,10 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { asAssetPath, CopilotError, ProjectStateSchema } from "@reaper-copilot/core";
+import { asAssetPath, CopilotError, ProjectStateSchema, type JobStatus } from "@reaper-copilot/core";
 import { afterAll, describe, expect, it } from "vitest";
 import { ReaperDaw } from "./reaper-daw.ts";
+import { readWavDuration } from "./wav.ts";
 
 // Needs Reaper open with reaper/bridge/bridge.lua loaded (see CLAUDE.md).
 const daw = new ReaperDaw({ pathStyle: process.env["WSL_DISTRO_NAME"] ? "unc" : "identity" });
@@ -55,6 +56,28 @@ function clickTrack(bpm: number, bars: number, leadSec: number, sampleRate = 220
 }
 
 let tmp: string | undefined;
+
+async function waitForJob(jobId: string): Promise<JobStatus> {
+  const deadline = Date.now() + 60_000;
+  for (;;) {
+    const job = await daw.getJob(jobId);
+    if (job.status !== "rendering" || Date.now() > deadline) return job;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+}
+
+/** Undoes the copilot's steps until the project has the original tracks again (cleanup of a test, even a failed one). */
+async function restore(originalTrackIds: string[]): Promise<void> {
+  for (let i = 0; i < 30; i++) {
+    const ids = (await daw.getProjectState().catch(() => null))?.tracks.map((t) => t.id);
+    if (ids !== undefined && ids.length === originalTrackIds.length && ids.every((id, n) => id === originalTrackIds[n])) return;
+    if (ids === undefined) {
+      await new Promise((resolve) => setTimeout(resolve, 500)); // still rendering
+      continue;
+    }
+    await daw.undo().catch(() => {});
+  }
+}
 afterAll(async () => {
   if (tmp) await rm(tmp, { recursive: true, force: true });
 });
@@ -192,5 +215,47 @@ describe("Reaper bridge (real)", () => {
     let undone = (await daw.undo()).undone;
     while (undone !== "Copilot: import_audio") undone = (await daw.undo()).undone;
     expect(await daw.getProjectState()).toEqual(before);
+  });
+
+  it("renders the sliced and stretched loop with distortion_hard and refuses an existing output", async () => {
+    await mkdir(WORKSPACE, { recursive: true });
+    tmp ??= await mkdtemp(path.join(WORKSPACE, "test-reaper-"));
+    const file = path.join(tmp, "click-render.wav");
+    await writeFile(file, clickTrack(150, 16, 0.5));
+    const output = path.join(tmp, "render-out.wav");
+
+    const before = await daw.getProjectState();
+    try {
+      const { track, item } = await daw.importAudio(asAssetPath(file));
+      await daw.sliceByBars(item.id, { sourceBpm: 150, startBar: 5, bars: 4, offsetSec: 0.5 });
+      await daw.stretchToTempo(item.id, { sourceBpm: 150, targetBpm: 170 });
+      await daw.applyFxChain(track.id, [
+        { plugin: "JS: Waveshaping Distortion", params: [{ name: "Distortion (%)", value: 60 }] },
+        {
+          plugin: "ReaLimit (Cockos)",
+          params: [
+            { name: "Threshold", value: -6 },
+            { name: "Ceiling", value: -0.3 },
+          ],
+        },
+      ]);
+
+      const jobId = await daw.render(item.id, asAssetPath(output));
+      const busy = await daw.getProjectState().catch((e: unknown) => e);
+      expect(busy).toMatchObject({ code: "daw_busy" });
+      const job = await waitForJob(jobId);
+      expect(job.status).toBe("done");
+      const header = await readWavDuration(output);
+      expect(Math.abs((header ?? 0) - 5.647)).toBeLessThan(0.02);
+      if (job.status === "done") expect(Math.abs(job.output.durationSec - 5.647)).toBeLessThan(0.02);
+
+      // Same name again: refused before Reaper opens its overwrite dialog.
+      const again = await waitForJob(await daw.render(item.id, asAssetPath(output)));
+      expect(again).toMatchObject({ status: "failed", errorCode: "render_failed" });
+      expect((await daw.getProjectState()).tracks.length).toBeGreaterThan(before.tracks.length);
+    } finally {
+      await restore(before.tracks.map((t) => t.id));
+      await rm(output, { force: true });
+    }
   });
 });

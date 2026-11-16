@@ -1,10 +1,13 @@
 import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-export type FakeBridgeHandler = (
-  method: string,
-  params: unknown,
-) => { ok: true; result: unknown } | { ok: false; error: { code: string; message?: string } } | "silence";
+type FakeBridgeReply =
+  | { ok: true; result: unknown }
+  | { ok: false; error: { code: string; message?: string } }
+  | "silence";
+
+/** May be async: like the real bridge, it serves nothing else until the handler settles. */
+export type FakeBridgeHandler = (method: string, params: unknown) => FakeBridgeReply | Promise<FakeBridgeReply>;
 
 /** Stand-in for `bridge.lua` in tests: same files, same protocol, handler in Node. */
 export class FakeBridge {
@@ -56,7 +59,7 @@ export class FakeBridge {
         if (raw === null) continue;
         const request = JSON.parse(raw) as { id: string; method: string; params: unknown };
         this.seen.push(request.method);
-        const reply = this.handler(request.method, request.params);
+        const reply = await this.handler(request.method, request.params);
         if (reply === "silence") continue;
         const out = path.join(this.ipcDir, "outbox", `${request.id}.json`);
         await writeFile(`${out}.tmp`, JSON.stringify({ id: request.id, ...reply }));

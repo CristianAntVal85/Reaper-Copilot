@@ -170,6 +170,7 @@ end
 -- Heartbeat and lock ------------------------------------------------------
 local instance = reaper.genGuid("")
 local state = "idle"
+local last_beat = 0
 
 local function write_heartbeat()
   -- Overwritten in place: the client only looks at its mtime and, if stale, at `state`.
@@ -463,6 +464,54 @@ function methods.apply_fx_chain(params)
   end)
 end
 
+-- Render is synchronous: the bridge serves nothing else while it runs, and the heartbeat says
+-- "rendering" so the client does not take the silence for a dead bridge. The output name is generated
+-- by the server; if it already exists Reaper would open a modal dialog that blocks this script, so
+-- that case is refused before calling Reaper.
+function methods.render(params)
+  local out = params.path
+  if type(out) ~= "string" or out == "" then fail("invalid_params", "path must be a non-empty string") end
+  local dir, name = out:match("^(.*)[/\\]([^/\\]+)%.[wW][aA][vV]$")
+  if not dir or dir == "" or name == "" then fail("invalid_params", "path must name a .wav file") end
+  local item, take = find_item(params.itemId)
+  if reaper.file_exists(out) then fail("output_exists", "the output file already exists") end
+
+  return undoable("render", function()
+    -- Put the media online; offline media renders as silence without any error.
+    reaper.Main_OnCommand(40182, 0) -- select all items
+    reaper.Main_OnCommand(40439, 0) -- set selected media online
+    reaper.Main_OnCommand(40289, 0) -- unselect all items
+    local source = reaper.GetMediaItemTake_Source(take)
+    if not source or reaper.GetMediaSourceLength(source) <= 0 then
+      fail("media_offline", "the item's source has no length")
+    end
+
+    local position = reaper.GetMediaItemInfo_Value(item, "D_POSITION")
+    local length = reaper.GetMediaItemInfo_Value(item, "D_LENGTH")
+    if length <= 0 then fail("render_failed", "the item has no length") end
+    local prev_start, prev_end = reaper.GetSet_LoopTimeRange2(0, false, false, 0, 0, false)
+    reaper.GetSet_LoopTimeRange2(0, true, false, position, position + length, false)
+    reaper.GetSetProjectInfo_String(0, "RENDER_FILE", dir, true)
+    reaper.GetSetProjectInfo_String(0, "RENDER_PATTERN", name, true)
+    reaper.GetSetProjectInfo_String(0, "RENDER_FORMAT", "evaw", true) -- WAV
+    reaper.GetSetProjectInfo(0, "RENDER_SETTINGS", 0, true)           -- master mix
+    reaper.GetSetProjectInfo(0, "RENDER_BOUNDSFLAG", 2, true)         -- time selection
+    reaper.GetSetProjectInfo(0, "RENDER_TAILFLAG", 0, true)
+
+    state = "rendering"
+    write_heartbeat()
+    local ok, err = pcall(reaper.Main_OnCommand, 42230, 0) -- render, most recent settings, auto-close
+    state = "idle"
+    write_heartbeat()
+    last_beat = reaper.time_precise()
+    reaper.GetSet_LoopTimeRange2(0, true, false, prev_start, prev_end, false)
+    if not ok then fail("render_failed", tostring(err)) end
+
+    if not reaper.file_exists(out) then fail("render_failed", "Reaper did not write the output file") end
+    return { lengthSec = length }
+  end)
+end
+
 -- Only undoes the copilot's own blocks: never the user's work.
 function methods.undo()
   local label = reaper.Undo_CanUndo2(0)
@@ -559,8 +608,6 @@ local function clear_inbox()
     i = i + 1
   end
 end
-
-local last_beat = 0
 
 local function loop()
   if not running then
