@@ -1,0 +1,22 @@
+{
+  "name": "@reaper-copilot/adapter-storage-sqlite",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "lint": "eslint ."
+  },
+  "nx": {
+    "tags": [
+      "scope:adapter"
+    ]
+  },
+  "dependencies": {
+    "@reaper-copilot/core": "workspace:*"
+  }
+}

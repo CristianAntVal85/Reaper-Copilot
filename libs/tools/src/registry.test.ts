@@ -1,3 +1,4 @@
+import { FakeStorage } from "@reaper-copilot/testing";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { createToolRegistry } from "./registry.ts";
@@ -37,7 +38,12 @@ describe("createToolRegistry", () => {
 
   it("keeps handler types inferred from the schemas", async () => {
     const t = tool("reader", "read");
-    const ctx = { workspaceRoot: "/ws", analyzer: { analyze: async () => Promise.reject() } };
+    const ctx = {
+      workspaceRoot: "/ws",
+      analyzer: { analyze: async () => Promise.reject() },
+      storage: new FakeStorage(),
+      log: () => {},
+    };
     expect(await t.handler({ n: 2 }, ctx)).toEqual({ doubled: 4 });
   });
 });

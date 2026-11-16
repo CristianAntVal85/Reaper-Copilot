@@ -2,7 +2,7 @@ import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { AudioFeaturesSchema, CopilotError } from "@reaper-copilot/core";
-import { FakeAnalyzer } from "@reaper-copilot/testing";
+import { FakeAnalyzer, FakeStorage } from "@reaper-copilot/testing";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { analyzeAudio, AnalyzeAudioInputSchema } from "./analyze-audio.ts";
 import { ALL_TOOLS } from "./tools.ts";
@@ -19,7 +19,12 @@ afterAll(async () => {
 });
 
 const run = (analyzer: FakeAnalyzer, input: { path: string; targetBpm?: number }) =>
-  analyzeAudio.handler(input, { workspaceRoot: ws, analyzer });
+  analyzeAudio.handler(input, {
+    workspaceRoot: ws,
+    analyzer,
+    storage: new FakeStorage(),
+    log: () => {},
+  });
 
 describe("analyze_audio", () => {
   it("is a read tool and part of ALL_TOOLS", () => {

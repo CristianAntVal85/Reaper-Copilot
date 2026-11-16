@@ -11,7 +11,7 @@ from analysis.key import estimate_key
 from analysis.levels import band_energies_db, crest_factor_db, integrated_lufs, peak_db
 from analysis.tempo import SAMPLE_RATE, estimate_tempo
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 class _Parser(argparse.ArgumentParser):
@@ -54,6 +54,13 @@ def analyze(path: Path, target_bpm: float | None) -> dict:
             "bpm": tempo.bpm,
             "confidence": tempo.confidence,
             "alternatives": tempo.alternatives,
+            "target": None
+            if tempo.target is None
+            else {
+                "bpm": tempo.target.bpm,
+                "deviationBpm": tempo.target.deviation_bpm,
+                "matches": tempo.target.matches,
+            },
         },
         "key": {
             "tonic": key.tonic,

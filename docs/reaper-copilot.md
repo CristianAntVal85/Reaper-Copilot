@@ -1,6 +1,6 @@
 # Reaper Copilot
 
-Documento maestro del proyecto (v2.6, 16-nov-2026). Es la fuente de verdad: sustituye a los borradores anteriores.
+Documento maestro del proyecto (v2.7, 16-nov-2026). Es la fuente de verdad: sustituye a los borradores anteriores.
 
 Lo leen tres públicos:
 
@@ -204,15 +204,27 @@ interface DawPort {
 
 interface AnalyzerPort {
   analyze(path: AssetPath, options?: { targetBpm?: number }): Promise<AudioFeatures>;
-  compare(a: AssetPath, b: AssetPath): Promise<FeatureDiff>; // llega en F1b
 }
 
-interface StoragePort { /* tareas, trazas, trabajos, caché de análisis, assets */ }
+// F1b. Tareas, trabajos y assets se añadirán en las fases siguientes.
+interface AnalysisCacheKey { sha256: string; targetBpm: number | null; revision: string }
+interface ToolCallTrace {
+  sessionId: string; step: number; tool: string;
+  args: unknown; ok: boolean; result: unknown | null; errorCode: string | null;
+  durationMs: number; startedAt: string; // ISO 8601
+  cacheHits: number;
+}
+interface StoragePort {
+  getCachedAnalysis(key: AnalysisCacheKey): Promise<AudioFeatures | null>;
+  putCachedAnalysis(key: AnalysisCacheKey, features: AudioFeatures): Promise<void>;
+  recordToolCall(trace: ToolCallTrace): Promise<void>;
+  listToolCalls(options?: { limit?: number }): Promise<ToolCallTrace[]>; // más recientes primero
+}
 
 interface LlmPort { runTurn(input: TurnInput): AsyncIterable<LlmEvent>; } // solo Live
 ```
 
-Son un punto de partida; el planificador puede ajustarlos.
+Son un punto de partida; el planificador puede ajustarlos. `AnalyzerPort` no tiene `compare`: la comparación es una función pura de `core` (`compareFeatures`) sobre dos `AudioFeatures`, así reutiliza la caché y no vuelve a cargar librosa.
 
 ---
 
@@ -222,8 +234,8 @@ Conjunto cerrado. Pocas, de alto nivel y con descripciones claras.
 
 | Herramienta | Riesgo | Descripción |
 |---|---|---|
-| `analyze_audio` | lectura | Analiza un archivo y devuelve JSON compacto. Caché por sha256 (desde F1b) |
-| `compare_audio` | lectura | Diferencias entre dos análisis |
+| `analyze_audio` | lectura | Analiza un archivo y devuelve JSON compacto. Caché por sha256 de los bytes del archivo, el `targetBpm` y la revisión del método de análisis (sección 9.3) |
+| `compare_audio` | lectura | Diferencias entre dos análisis. Entrada `{ a: { path, targetBpm? }, b: { path, targetBpm? } }`. Salida `{ a, b, metrics, tempo, key }`: `a` y `b` con la ruta del cliente y el sha256; `metrics` con las 11 métricas de la sección 9.2, cada una con `a`, `b` y `delta = b − a` (2 decimales); `tempo` con `confidence` y `target` de cada lado; `key` con `a`, `b` y `same`. Usa la caché |
 | `get_project_state` | lectura | Pistas, items y tempo del proyecto |
 | `list_presets` | lectura | Presets de FX con sus parámetros y rangos |
 | `get_job_status` | lectura | Estado de un render o análisis largo |
@@ -247,14 +259,15 @@ En modo `mentor` solo se exponen las de lectura.
 
 ### 8.1 TypeScript con Python
 
-- CLI: `python -m analysis analyze [--target-bpm N] -- <ruta>` (F1a) y `python -m analysis compare <a> <b>` (F1b). El `--` evita que un nombre de archivo se lea como opción.
+- CLI: `python -m analysis analyze [--target-bpm N] -- <ruta>`. No hay subcomando `compare`: la comparación se calcula en TypeScript (sección 6.4). El `--` evita que un nombre de archivo se lea como opción.
 - Salida JSON por stdout; errores por stderr con un código legible al principio (`file_not_found: …`) y código de salida distinto de cero: 2 `file_not_found` (inexistente o ilegible), 3 `unsupported_format` (formato no admitido, audio de menos de 0,5 s o fallo al decodificar), 1 `analysis_failed` (cualquier otro error, incluidos los de argumentos).
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "file": { "sha256": "…", "durationSec": 12.4, "sampleRate": 44100, "channels": 2 },
-  "tempo": { "bpm": 128.0, "confidence": 0.82, "alternatives": [64.0, 256.0] },
+  "tempo": { "bpm": 128.0, "confidence": 0.82, "alternatives": [64.0, 256.0],
+             "target": { "bpm": 130, "deviationBpm": -2.0, "matches": false } },
   "key": { "tonic": "A", "mode": "minor", "confidence": 0.61 },
   "loudness": { "integratedLufs": -9.3, "peakDb": -0.4 },
   "bands": { "sub": -18.2, "bass": -12.1, "lowMid": -14.0, "mid": -15.3, "highMid": -17.8, "high": -22.5 },
@@ -263,19 +276,20 @@ En modo `mentor` solo se exponen las de lectura.
 ```
 
 - El esquema vive en zod (`AudioFeaturesSchema`, en `libs/core`) y es estricto: no admite campos extra. Hay tests de contrato contra la salida real de Python (`test:contract`).
+- **Tempo.** `tempo.target` es `null` sin tempo objetivo; con él, `{ bpm, deviationBpm, matches }`, donde `deviationBpm = bpm − target.bpm` (con el `bpm` ya redondeado, 2 decimales) y `matches = |deviationBpm| ≤ 1`. `schemaVersion` es 2 desde F1b.
 - **Archivo.** `sha256` son los bytes del archivo, en hexadecimal minúscula. `durationSec`, `sampleRate` y `channels` son los del archivo original y positivos.
 - **Tonalidad.** `tonic` es una de `C, C#, D, D#, E, F, F#, G, G#, A, A#, B`; `mode`, `major` o `minor`; las confianzas van de 0 a 1. Se obtiene del croma CQT y los perfiles de Krumhansl-Kessler. En silencio sale `C major` con confianza 0.
-- **Sonoridad y dinámica.** `integratedLufs` con pyloudnorm. `peakDb` es el pico de muestra entre todos los canales. `crestFactorDb` es el pico menos el RMS global, con mínimo 0.
+- **Sonoridad y dinámica.** `integratedLufs` con pyloudnorm. `peakDb` es el pico de muestra del audio decodificado, entre todos los canales. No es pico real (*true peak*) y en formatos con pérdida puede superar 0 dBFS (medido: los MP3 de prueba, masterizados a ~−4 LUFS, tienen entre el 1 y el 3 % de muestras por encima de 0 dBFS y picos de hasta +5,45 dB). `crestFactorDb` es el pico menos el RMS global, con mínimo 0.
 - **Bandas** (Hz, intervalos [bajo, alto)): `sub` 20-60, `bass` 60-250, `lowMid` 250-500, `mid` 500-2000, `highMid` 2000-6000, `high` 6000-20000. Se calculan sobre la mezcla mono con Welch, en dB relativos a un seno de fondo de escala: un seno a −12 dBFS da −12 en su banda.
 - **Números finitos.** Lo que saldría como menos infinito (silencio) se limita a −120. Redondeo: dB y BPM a 2 decimales, confianzas a 3.
-- **Errores de dominio** (`CopilotError`, lista cerrada de códigos): `path_outside_workspace`, `file_not_found`, `unsupported_format`, `analysis_failed`, `analysis_timeout`, `invalid_analysis_output`. El servidor MCP los devuelve con `isError: true` y el código al principio del mensaje. Para un error inesperado devuelve `internal_error: the tool failed unexpectedly`: es un código del protocolo, no del dominio, y el detalle solo va por stderr.
+- **Errores de dominio** (`CopilotError`, lista cerrada de códigos): `path_outside_workspace`, `file_not_found`, `unsupported_format`, `analysis_failed`, `analysis_timeout`, `invalid_analysis_output`. El servidor MCP los devuelve con `isError: true` y el código al principio del mensaje. Hay además dos códigos de protocolo, fuera de la lista de dominio: `internal_error` (error inesperado o salida de una herramienta fuera de su esquema; antes esto último daba `invalid_analysis_output`), con el mensaje `internal_error: the tool failed unexpectedly`, e `invalid_input` (entrada que no cumple el esquema; mensaje fijo). El detalle de ambos solo va al registro (stderr).
 - **Adaptador** (`libs/adapters/analysis-py`): proceso hijo sin shell, tiempo límite de 120 s por defecto, stdout de 1 MB como máximo y stderr truncado a 8 KiB. La salida se valida con el esquema antes de devolverla.
 - **Rutas.** Relativas al workspace (`<repositorio>/workspace` por defecto, ignorado por git y que hay que crear; se cambia con `COPILOT_WORKSPACE`) o absolutas dentro de él. Se comprueba de forma léxica y otra vez tras `realpath`; extensiones admitidas: `.wav .flac .mp3 .aiff .ogg`.
-- **Servidor MCP** (`apps/mcp-server`, stdio). Variables: `MODE` (`mentor` por defecto; un valor inválido hace fallar el arranque), `COPILOT_WORKSPACE` y `COPILOT_PYTHON` (por defecto `python/analysis/.venv/bin/python`). El `.mcp.json` de la raíz lo registra con `MODE=agent`. `pnpm mcp:call <herramienta> '<json>'` llama a una herramienta desde la terminal. Medido: unos 1,7 s por análisis de 12 s de audio, casi todo arranque de librosa.
+- **Servidor MCP** (`apps/mcp-server`, stdio). Variables: `MODE` (`mentor` por defecto; un valor inválido hace fallar el arranque), `COPILOT_WORKSPACE` y `COPILOT_PYTHON` (por defecto `python/analysis/.venv/bin/python`). El `.mcp.json` de la raíz lo registra con `MODE=agent`. `pnpm mcp:call <herramienta> '<json>'` llama a una herramienta desde la terminal. `COPILOT_DATA_DIR` fija dónde se guarda la base SQLite (sección 9.3). `pnpm mcp:traces [n]` imprime las últimas `n` trazas. Medido: `analyze_audio` tarda 1,7 s la primera vez (casi todo arranque de librosa) y 0,2 s desde la caché; `compare_audio`, 7,8 s frente a 0,25 s.
 - **Método de tempo.** `librosa.feature.tempo` no se usa como medida final: sin pista cae a la mitad entre 180 y 210 BPM, y su resolución no permite afinar a ±1 BPM. El tempo se obtiene con una búsqueda fina (pasos de 0,05 BPM) sobre la autocorrelación de la envolvente de ataques, calculada con librosa y `hop_length=64`, puntuando cada candidato a 1, 2, 4 y 8 tiempos.
-- **Rango de búsqueda.** Con tempo objetivo, ±4 % alrededor. Sin él, el rango del género (140-230 BPM). En ambos casos se devuelven las alternativas mitad y doble.
+- **Rango de búsqueda.** Con tempo objetivo `t`, se busca en una octava centrada en él, `[t/√2, t·√2]`: el objetivo elige la octava (el tempo, su mitad o su doble) pero no arrastra la medida. Sin objetivo, el rango del género (140-230 BPM). En ambos casos se devuelven las alternativas mitad y doble. Motivo: con ±4 % alrededor del objetivo, un tema a 160 con objetivo 190 salía a 182,9 (descubierto al usar F1a); `tempo.target.matches` dice si la medida coincide con el objetivo.
 - **`tempo.confidence` es la puntuación de esa búsqueda** (0 a 1). Por debajo de 0,10 el tempo no se considera medible y el criterio de BPM devuelve `unmeasured` (sección 9.2). Umbral provisional.
-- Fragmentos de 4 compases sin tempo objetivo no son del todo fiables: por eso la comprobación principal del tempo es la duración (sección 9.2).
+- Fragmentos de 4 compases no son del todo fiables: por eso la comprobación principal del tempo es la duración (sección 9.2).
 - Origen: `specs/spikes/librosa-bpm-alto.md`.
 
 ### 8.2 TypeScript con Reaper
@@ -355,7 +369,7 @@ Un criterio es un dato, no texto libre. El esquema vive en zod en `libs/core` y 
 3. **Un criterio `delta` debe excluir el cero** (`min > 0` o `max < 0`): no puede cumplirse sin cambiar nada.
 4. **Criterios obligatorios derivados de `target`**, que el LLM no puede quitar:
    - Con `bpm` y `bars`: duración del render igual a `bars × beatsPerBar × 60 / bpm` con ±20 ms (4 compases a 170 BPM son 5,647 s). Es la comprobación principal del tempo, porque es determinista.
-   - Con `bpm`: `tempo.bpm` dentro de ±1, analizado con el objetivo como pista. Si la detección no es fiable, el resultado es `unmeasured`, no `fail`.
+   - Con `bpm`: `tempo.bpm` dentro de ±1, analizado con el objetivo para elegir la octava (sección 8.1); el criterio usa la desviación de `tempo.target` (`matches`, ±1 BPM). Si la detección no es fiable, el resultado es `unmeasured`, no `fail`.
 
 **Salida de `verify_task`:**
 
@@ -375,7 +389,10 @@ Un criterio es un dato, no texto libre. El esquema vive en zod en `libs/core` y 
 
 ### 9.3 Trazas y exportación para el Replay
 
-- Cada llamada a herramienta se guarda en SQLite: tarea, paso, argumentos, resultado, duración y marca de tiempo.
+- Cada llamada a herramienta se guarda en SQLite (`node:sqlite`, `<repositorio>/.copilot/copilot.db`, o `COPILOT_DATA_DIR`; modo WAL y `busy_timeout` de 5 s, porque el servidor de Claude Code y `pnpm mcp:call` pueden abrirlo a la vez): sesión, paso, herramienta, argumentos, resultado, código de error, duración, marca de tiempo y aciertos de caché. Una fila por llamada, también las que fallan.
+- **Sin tarea hasta la fase 2.** El `taskId` llega con `start_task`. Mientras tanto, `sessionId` es un UUID por arranque del servidor y `step` cuenta desde 1 en cada sesión (con `pnpm mcp:call`, que arranca un servidor por llamada, siempre es 1).
+- Las trazas no llevan rutas absolutas ni la causa de los errores. Un fallo al escribir la traza o la caché se registra por stderr y no rompe la herramienta.
+- **Caché de análisis.** Clave: sha256 de los bytes del archivo, `targetBpm` (o `null`) y `revision = "<schemaVersion>.<ANALYSIS_REVISION>"`. `ANALYSIS_REVISION` es una constante de `libs/core` que se sube a mano al cambiar el método de análisis de Python. Lo leído de la caché se valida con `AudioFeaturesSchema`; si no pasa, se analiza de nuevo.
 - Un comando `export-replay` genera, por cada ejecución elegida, una carpeta con `run.json` (petición, pasos, criterios, resultados, análisis) y los audios antes y después en formato comprimido.
 - El sitio Replay solo lee esos archivos. Así el Replay muestra ejecuciones reales, no maquetas.
 
@@ -511,7 +528,7 @@ El spike de Reaper sin pantalla puede adelantarse a la fase 0 si el portátil es
 - **Backend Live:** NestJS. **Frontend:** Angular.
 - **LLM (solo Live):** `@anthropic-ai/sdk`. Su `toolRunner` está en beta; alternativa: un bucle propio detrás de `LlmPort`.
 - **Python 3.11+** con `venv` + `pip`: librosa, pyloudnorm, numpy, scipy, soundfile.
-- **Reaper** con puente en Lua y plugins de serie: nativo de Windows en desarrollo, para Linux en el servidor. **ffmpeg** (no en F1a; ver §11.3). **SQLite**.
+- **Reaper** con puente en Lua y plugins de serie: nativo de Windows en desarrollo, para Linux en el servidor. **ffmpeg** (no en F1a; ver §11.3). **SQLite** con `node:sqlite` de Node 24, sin dependencia añadida (experimental; queda detrás de `StoragePort`).
 
 ### 14.2 Pruebas
 
@@ -535,7 +552,8 @@ El spike de Reaper sin pantalla puede adelantarse a la fase 0 si el portátil es
 |---|---|
 | Reaper es de una sola instancia: no escala a muchos usuarios | Cola de una ejecución; el Replay no depende de Reaper. Escalar exigiría una instancia por sesión y revisar la licencia |
 | Reaper sin pantalla en el portátil no funciona como se espera | Spike temprano; plan B: sesión gráfica mínima |
-| BPM poco fiable en fragmentos cortos o sin bombo | Búsqueda fina con el tempo objetivo como pista; confianza y estado `unmeasured`; la duración como comprobación principal |
+| BPM poco fiable en fragmentos cortos o sin bombo | Búsqueda fina con el tempo objetivo eligiendo la octava; confianza y estado `unmeasured`; la duración como comprobación principal |
+| Fragmentos cortos sin el margen del ±4 % | Con la ventana de una octava se pierde un caso que la ventana estrecha acertaba (en el spike, 4 compases: 16 de 18 frente a 17 de 18). La duración sigue siendo la comprobación principal |
 | El portátil o la conexión de casa se caen | El Replay vive en hosting estático; indicador de disponibilidad |
 | Abuso o gasto en Live | Invitación, límites, tope mensual, sin subida de archivos |
 | Funciones MCP avanzadas no disponibles en todas las superficies | Usar solo herramientas estándar |
@@ -553,7 +571,7 @@ El spike de Reaper sin pantalla puede adelantarse a la fase 0 si el portátil es
 7. Nombres y parámetros finales de los presets de FX para hardstyle y hardcore.
 8. Licencia de la documentación de Reaper: si permite ofrecer la búsqueda en el modo Live público.
 9. Modelo de embeddings local y extensión vectorial de SQLite para la búsqueda en documentación.
-10. Umbral de confianza para `unmeasured` (0,10, provisional): sale de 36 fragmentos de temas masterizados, con poco margen. Revisarlo con loops sueltos, breaks sin bombo y audio estirado por Reaper. La tolerancia de ±1 BPM queda confirmada; la de ±20 ms de duración, sin probar.
+10. Umbral de confianza para `unmeasured` (0,10, provisional): sale de 36 fragmentos de temas masterizados, con poco margen. Revisarlo con loops sueltos, breaks sin bombo y audio estirado por Reaper, y también con la ventana de una octava. La tolerancia de ±1 BPM queda confirmada; la de ±20 ms de duración, sin probar.
 11. Cómo detectar el primer tiempo del compás para `slice_loop`: no se validó en el spike (hace falta material en WAV con el primer tiempo conocido).
 
 ---

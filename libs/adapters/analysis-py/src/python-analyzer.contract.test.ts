@@ -67,6 +67,13 @@ describe("PythonAnalyzer with the real analysis package", () => {
     expect(features.file.channels).toBe(2);
     expect(features.file.durationSec).toBeCloseTo(10, 1);
     expect(features.tempo.bpm).toBeCloseTo(150, 0);
+    expect(features.tempo.target?.matches).toBe(true);
+  });
+
+  it("returns tempo.target as null without a target", async () => {
+    const features = await analyzer.analyze(asAssetPath(wavPath));
+    expect(features.schemaVersion).toBe(2);
+    expect(features.tempo.target).toBeNull();
   });
 
   it("reports file_not_found for a missing file", async () => {

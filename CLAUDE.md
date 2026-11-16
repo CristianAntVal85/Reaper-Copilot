@@ -28,12 +28,14 @@ En caso de duda entre dos vías, elige la más ligera y sube si el cambio crece.
 - `pnpm check:full`: todo lo anterior en todo el repositorio, más `py:test` y `test:contract` (Python real). Se ejecuta al cerrar una fase.
 - `pnpm py:setup`: crea `python/analysis/.venv` e instala el paquete. Se ejecuta una vez, antes de `pnpm check:full`.
 - `pnpm mcp:call <herramienta> '<json>'`: llama a una herramienta del servidor MCP por stdio, sin Claude Code.
+- `pnpm mcp:traces [n]`: imprime las últimas `n` trazas de llamadas a herramientas (SQLite).
 - `pnpm test:reaper`: integración con Reaper real. Solo en local, con Reaper abierto. Llega en la fase 2.
 
 ## Servidor MCP
 
 - Se registra con `.mcp.json` en la raíz (`reaper-copilot`, `MODE=agent`). Claude Code pide aprobarlo la primera vez; `claude mcp list` lo comprueba.
 - Las rutas de audio van relativas a `workspace/` (ignorado por git, hay que crearlo) o absolutas dentro de él. `COPILOT_WORKSPACE` lo cambia; `MODE` por defecto es `mentor`.
+- Trazas y caché de análisis en SQLite: `<repositorio>/.copilot/copilot.db` (ignorado por git); `COPILOT_DATA_DIR` cambia la carpeta. Al cambiar el método de análisis de Python, sube `ANALYSIS_REVISION` (`libs/core`) o borra `.copilot/`: si no, la caché devuelve análisis antiguos.
 
 ## Estructura
 

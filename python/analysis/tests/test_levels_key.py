@@ -88,7 +88,7 @@ def test_output_has_exactly_the_contract_keys_and_finite_numbers(write_wav):
     assert {k: set(v) if isinstance(v, dict) else None for k, v in output.items()} == {
         "schemaVersion": None,
         "file": {"sha256", "durationSec", "sampleRate", "channels"},
-        "tempo": {"bpm", "confidence", "alternatives"},
+        "tempo": {"bpm", "confidence", "alternatives", "target"},
         "key": {"tonic", "mode", "confidence"},
         "loudness": {"integratedLufs", "peakDb"},
         "bands": {"sub", "bass", "lowMid", "mid", "highMid", "high"},

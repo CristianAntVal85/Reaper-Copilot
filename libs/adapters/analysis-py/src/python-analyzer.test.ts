@@ -6,9 +6,9 @@ import { asAssetPath, CopilotError, type AudioFeatures } from "@reaper-copilot/c
 import { childEnv, PythonAnalyzer } from "./python-analyzer.ts";
 
 const VALID: AudioFeatures = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   file: { sha256: "a".repeat(64), durationSec: 12.4, sampleRate: 44100, channels: 2 },
-  tempo: { bpm: 128, confidence: 0.82, alternatives: [64, 256] },
+  tempo: { bpm: 128, confidence: 0.82, alternatives: [64, 256], target: null },
   key: { tonic: "A", mode: "minor", confidence: 0.61 },
   loudness: { integratedLufs: -9.3, peakDb: -0.4 },
   bands: { sub: -18.2, bass: -12.1, lowMid: -14, mid: -15.3, highMid: -17.8, high: -22.5 },
