@@ -200,6 +200,12 @@ importers:
         specifier: ^5.1.0
         version: 5.1.0(@types/node@24.19.2)(vite@8.3.8(@types/node@24.19.2)(yaml@2.9.0))
 
+  libs/adapters/analysis-py:
+    dependencies:
+      '@reaper-copilot/core':
+        specifier: workspace:*
+        version: link:../../core
+
   libs/core:
     dependencies:
       zod:

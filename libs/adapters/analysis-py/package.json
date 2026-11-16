@@ -1,0 +1,23 @@
+{
+  "name": "@reaper-copilot/adapter-analysis-py",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:contract": "vitest run --config vitest.contract.config.ts",
+    "lint": "eslint ."
+  },
+  "nx": {
+    "tags": [
+      "scope:adapter"
+    ]
+  },
+  "dependencies": {
+    "@reaper-copilot/core": "workspace:*"
+  }
+}
