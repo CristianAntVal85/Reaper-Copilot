@@ -7,6 +7,8 @@ from pathlib import Path
 from analysis import __version__
 from analysis.audio import load, to_mono
 from analysis.errors import AnalysisError, analysis_failed
+from analysis.key import estimate_key
+from analysis.levels import band_energies_db, crest_factor_db, integrated_lufs, peak_db
 from analysis.tempo import SAMPLE_RATE, estimate_tempo
 
 SCHEMA_VERSION = 1
@@ -39,6 +41,7 @@ def _build_parser() -> argparse.ArgumentParser:
 def analyze(path: Path, target_bpm: float | None) -> dict:
     audio = load(path)
     tempo = estimate_tempo(to_mono(audio, SAMPLE_RATE), target_bpm)
+    key = estimate_key(audio)
     return {
         "schemaVersion": SCHEMA_VERSION,
         "file": {
@@ -52,6 +55,17 @@ def analyze(path: Path, target_bpm: float | None) -> dict:
             "confidence": tempo.confidence,
             "alternatives": tempo.alternatives,
         },
+        "key": {
+            "tonic": key.tonic,
+            "mode": key.mode,
+            "confidence": round(key.confidence, 3),
+        },
+        "loudness": {
+            "integratedLufs": round(integrated_lufs(audio), 2),
+            "peakDb": round(peak_db(audio), 2),
+        },
+        "bands": {name: round(value, 2) for name, value in band_energies_db(audio).items()},
+        "dynamics": {"crestFactorDb": round(crest_factor_db(audio), 2)},
     }
 
 
