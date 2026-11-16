@@ -19,6 +19,7 @@ __pycache__/
 *.sqlite
 *.sqlite-*
 workspace/
+.copilot/
 spikes/**/out/
 
 # Claude Code (ajustes personales)

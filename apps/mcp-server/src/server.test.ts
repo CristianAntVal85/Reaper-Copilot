@@ -63,6 +63,7 @@ async function connect(options: {
   log?: (message: string) => void;
 }) {
   const analyzer = options.analyzer ?? new FakeAnalyzer();
+  const storage = new FakeStorage();
   const registry = createToolRegistry([...ALL_TOOLS, ...(options.extraTools ?? [])], options.mode);
   const server = createServer({
     registry,
@@ -70,14 +71,14 @@ async function connect(options: {
     context: {
       workspaceRoot: ws,
       analyzer,
-      storage: new FakeStorage(),
+      storage,
       log: options.log ?? (() => {}),
     },
   });
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: "test-client", version: "0.0.0" });
   await Promise.all([server.connect(serverSide), client.connect(clientSide)]);
-  return { client, analyzer, close: () => client.close() };
+  return { client, analyzer, storage, close: () => client.close() };
 }
 
 const textOf = (result: object): string => {
@@ -95,6 +96,22 @@ describe("MCP server", () => {
       expect(tool.annotations?.readOnlyHint).toBe(true);
       expect(tool.outputSchema).toBeDefined();
     }
+    await close();
+  });
+
+  it("leaves one trace per call, successful or not", async () => {
+    const { client, storage, close } = await connect({ mode: "mentor" });
+    await client.callTool({ name: "analyze_audio", arguments: { path: "song.wav" } });
+    await client.callTool({
+      name: "compare_audio",
+      arguments: { a: { path: "song.wav" }, b: { path: "song.wav" } },
+    });
+    await client.callTool({ name: "analyze_audio", arguments: { path: "../../etc/passwd" } });
+    expect(storage.traces.map((t) => [t.sessionId, t.step, t.tool, t.ok, t.errorCode])).toEqual([
+      ["test-session", 1, "analyze_audio", true, null],
+      ["test-session", 2, "compare_audio", true, null],
+      ["test-session", 3, "analyze_audio", false, "path_outside_workspace"],
+    ]);
     await close();
   });
 

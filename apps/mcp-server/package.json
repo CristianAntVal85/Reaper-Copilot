@@ -20,6 +20,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
     "@reaper-copilot/adapter-analysis-py": "workspace:*",
+    "@reaper-copilot/adapter-storage-sqlite": "workspace:*",
     "@reaper-copilot/core": "workspace:*",
     "@reaper-copilot/tools": "workspace:*",
     "zod": "^4.6.7"
