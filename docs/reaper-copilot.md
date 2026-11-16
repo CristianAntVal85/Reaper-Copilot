@@ -1,6 +1,6 @@
 # Reaper Copilot
 
-Documento maestro del proyecto (v2.7, 16-nov-2026). Es la fuente de verdad: sustituye a los borradores anteriores.
+Documento maestro del proyecto (v2.8, 16-nov-2026). Es la fuente de verdad: sustituye a los borradores anteriores.
 
 Lo leen tres públicos:
 
@@ -74,6 +74,7 @@ El producto se entrega en **tres bloques** sobre un mismo núcleo:
 - **Modos**, por variable de entorno `MODE`:
   - `mentor`: solo se exponen las herramientas de lectura. El LLM analiza y explica, no toca nada.
   - `agent`: se exponen todas.
+  - Desde F2a, el `.mcp.json` del repositorio usa `mentor`; el autor registra `agent` en su ámbito local (`claude mcp add --scope local`). Sin reglas `ask` en `.claude/settings.json`: la protección vive en el servidor (sección 12.1).
 - Instalación para terceros: `claude mcp add` y un `.mcp.json` en el repositorio *(a comprobar)*.
 
 ### 4.2 Bloque Replay (portfolio, siempre disponible)
@@ -306,7 +307,13 @@ En modo `mentor` solo se exponen las de lectura.
 - **El render es síncrono dentro del puente:** mientras renderiza no atiende nada. El trabajo asíncrono (`jobId`, `get_job_status`) vive en el adaptador, que espera la respuesta y contesta el estado sin preguntar a Reaper. La señal de vida del puente indica cuándo está renderizando, porque un latido se congela.
 - **Carga del puente.** En desarrollo, `reaper.exe -nonewinst bridge.lua` lo carga en el Reaper ya abierto. En Linux eso arranca otra instancia: en el servidor el puente se pasa como argumento al arrancar Reaper.
 - **Detalles de ReaScript:** el listado de `reaper.EnumerateFiles` se refresca con índice `-1` en cada ciclo, y el JSON se codifica dentro de `bridge.lua` (Lua no lo trae).
-- Origen de estas decisiones: `specs/spikes/reaper-bridge-wsl.md` y `specs/spikes/reaper-bridge-windows.md`.
+- **Operaciones** (spike `reaper-ops`):
+  - **Corte:** desplazamiento de la toma (`D_STARTOFFS`, `D_LENGTH`), no división, que añade un fundido. Parámetros explícitos `sourceBpm`, `offsetSec` (por defecto 0: el primer tiempo está al principio), `startBar`, `bars` y `beatsPerBar`. Sin detección del primer tiempo.
+  - **Estirado:** tasa de reproducción con el tono conservado. Al importar, el puente pone el item en timebase de tiempo (`C_BEATATTACHMODE` = 0): con el valor del proyecto, un cambio de tempo vuelve a estirar el item.
+  - **Parámetros de FX:** los VST de Cockos reciben valores normalizados y los JS unidades reales. Los presets se expresan por nombre de parámetro y valor mostrado (dB, Hz, %); el puente busca el valor normalizado por bisección sobre `TrackFX_FormatParamValueNormalized`.
+  - **Render:** WAV de la selección de tiempo igual a los límites del item, con nombre único por trabajo; el puente se niega si el archivo existe, porque Reaper abriría un diálogo modal y bloquearía el puente.
+  - **Medio fuera de línea:** con la preferencia «Set media offline when application is not active», el render sale en silencio. Antes de renderizar, el puente pone el medio en línea y comprueba que la fuente tiene longitud.
+- Origen de estas decisiones: `specs/spikes/reaper-bridge-wsl.md`, `specs/spikes/reaper-bridge-windows.md` y `specs/spikes/reaper-ops.md`.
 
 ---
 
@@ -507,7 +514,8 @@ Lista de trabajo. Los comandos concretos se validan en la fase 4.
 | **0b. Andamiaje** | Repositorio git y `.gitignore`; monorepo Nx con pnpm; `libs/core` vacía con una prueba; `pnpm check` y `pnpm check:full`; paquete Python con `pytest`; CI ajustado | `pnpm check` y `pnpm check:full` en verde en local y el CI en verde en una pull request |
 | **1a. MCP con análisis** | `core`, `tools`, adaptador de Python, `analyze_audio`, servidor MCP por stdio, `FakeAnalyzer` | Pedir un análisis desde Claude Code y recibir JSON validado |
 | **1b. Comparación y trazas** | `compare_audio`, caché por sha256, SQLite con trazas | Comparar dos archivos desde Claude Code; el segundo análisis del mismo archivo sale de la caché |
-| **2. MCP con Reaper** | Adaptador de Reaper, herramientas que modifican, presets, render asíncrono, `start_task`, `verify_task`, modos | El caso "loop a 170" de punta a punta desde Claude Code, verificado con criterios |
+| **2a. Reaper desde MCP** | `bridge.lua`, adaptador de Reaper con traducción de rutas, `DawPort`, `FakeDaw`, herramientas de Reaper (estado, importar, tempo, cortar, estirar, presets y FX, render asíncrono, estado del trabajo, deshacer), modo `mentor` en `.mcp.json` | Desde Claude Code: importar, cortar 4 compases, estirar a 170, aplicar un preset y renderizar; el render dura lo esperado (±20 ms) medido con `analyze_audio` |
+| **2b. Tareas y verificación** | `start_task`, `verify_task`, criterios (sección 9.2), `taskId` en las trazas | El caso "loop a 170" de punta a punta desde Claude Code, verificado con criterios |
 | **3. Replay** | `export-replay`, aplicación Angular con reproductor, forma de onda, espectro y pasos; despliegue estático | URL pública con al menos tres ejecuciones reales |
 | **4. Live** | Spike de Reaper sin pantalla en el portátil; `LlmPort`, bucle del agente, API NestJS, cola, invitaciones, límites; preparación del servidor y túnel | Ejecución en vivo desde la web con código de invitación y tope de gasto activo |
 | **5. Ampliaciones** | Búsqueda en la documentación de Reaper (sección 5.4), recetas por género, comparación con referencia, MIDI, stems, LLM local, otros clientes | Para la búsqueda en documentación: preguntar desde Claude Code y recibir respuesta con cita; evaluación de recuperación medida. Resto por definir |
@@ -572,7 +580,7 @@ El spike de Reaper sin pantalla puede adelantarse a la fase 0 si el portátil es
 8. Licencia de la documentación de Reaper: si permite ofrecer la búsqueda en el modo Live público.
 9. Modelo de embeddings local y extensión vectorial de SQLite para la búsqueda en documentación.
 10. Umbral de confianza para `unmeasured` (0,10, provisional): sale de 36 fragmentos de temas masterizados, con poco margen. Revisarlo con loops sueltos, breaks sin bombo y audio estirado por Reaper, y también con la ventana de una octava. La tolerancia de ±1 BPM queda confirmada; la de ±20 ms de duración, sin probar.
-11. Cómo detectar el primer tiempo del compás para `slice_loop`: no se validó en el spike (hace falta material en WAV con el primer tiempo conocido).
+11. Cómo detectar el primer tiempo del compás para `slice_loop`. Hasta la fase 5, `slice_loop` recibe `offsetSec` explícito (sección 8.2); la detección automática queda sin validar.
 
 ---
 
