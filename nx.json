@@ -16,6 +16,7 @@
       "inputs": ["default", "{workspaceRoot}/eslint.config.mjs"]
     },
     "test": { "cache": true, "inputs": ["default", "^production"] },
-    "test:contract": { "cache": false }
+    "test:contract": { "cache": false },
+    "test:reaper": { "cache": false }
   }
 }

@@ -11,6 +11,7 @@
     "check:full": "nx run-many -t typecheck lint test && pnpm py:test && nx run-many -t test:contract",
     "py:setup": "python3 -m venv python/analysis/.venv && python/analysis/.venv/bin/pip install -e \"python/analysis[dev]\"",
     "py:test": "test -x python/analysis/.venv/bin/python || { echo 'Python environment missing: run pnpm py:setup first' >&2; exit 1; } && python/analysis/.venv/bin/python -m pytest python/analysis",
+    "test:reaper": "nx run-many -t test:reaper",
     "mcp:call": "node apps/mcp-server/scripts/mcp-call.ts",
     "mcp:traces": "node apps/mcp-server/scripts/mcp-traces.ts"
   },
