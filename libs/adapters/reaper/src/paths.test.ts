@@ -39,7 +39,7 @@ describe("fromDawPath", () => {
     expect(fromDawPath("\\\\wsl.localhost\\Debian\\home\\a.wav", unc)).toBeNull();
   });
   it("round-trips", () => {
-    const linux = "/home/cristian-pc/proyectos/x y/audio.wav";
+    const linux = "/home/user/projects/x y/audio.wav";
     expect(fromDawPath(toDawPath(linux, unc) ?? "", unc)).toBe(linux);
   });
   it("identity accepts absolute Linux paths only", () => {

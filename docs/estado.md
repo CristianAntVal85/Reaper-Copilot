@@ -6,7 +6,7 @@ Memoria entre sesiones. **Máximo 30 líneas, una idea por línea.** Lo que ya n
 
 ## Dónde estamos
 - Fase 2 partida en F2a (Reaper desde MCP) y F2b (tareas y verificación). F2a implementada (8/8 tareas) en `fase/F2a-reaper`, pendiente de validación, demostración y pull request.
-- Pendientes bajos de F2a: `ToolContext.daw`/`presets` siguen opcionales; las pruebas reales anteriores a T6 no limpian en `finally`; el render no restaura la selección de items ni los ajustes `RENDER_*`; `loadPresets` lanza `Error` normal. Otros: sin límite de tamaño ni memoria del audio; cola de un solo análisis para Live.
+- Pendientes bajos de F2a: `ToolContext.daw`/`presets` opcionales; pruebas reales anteriores a T6 sin `finally`; `loadPresets` lanza `Error` normal; outbox sin límite de tamaño y esquemas sin acotar textos; respuestas huérfanas en outbox sin limpiar al arrancar; `activeRender` por proceso (un servidor por IPC); nombres de pista/plugin sin tope hacia el LLM; posible bloque de deshacer vacío si `import_audio` falla a medias; rutas del home en `spikes/reaper-ops/*.mjs`. Otros: sin límite de tamaño ni memoria del audio; cola de un solo análisis para Live.
 - Antes de Live (fase 4): acotar `args` de las trazas; `.copilot/` en 0700 y `copilot.db` en 0600; la entrada inválida por MCP la rechaza el SDK y no deja traza.
 - Caché y almacenamiento: no guardar si el sha256 de Python difiere de la clave; validar la clave en `SqliteStorage` (objetivo 0 chocaría con «sin objetivo»); `hashFile` da `file_not_found` también con EACCES o EISDIR; `mcp:traces` abre la base en escritura; suite de almacenamiento duplicada.
 
