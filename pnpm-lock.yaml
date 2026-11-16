@@ -228,6 +228,12 @@ importers:
         specifier: workspace:*
         version: link:../../core
 
+  libs/adapters/storage-sqlite:
+    dependencies:
+      '@reaper-copilot/core':
+        specifier: workspace:*
+        version: link:../../core
+
   libs/core:
     dependencies:
       zod:
