@@ -2,6 +2,11 @@
 
 Entradas nuevas arriba. Una línea por cambio relevante: fecha, fase o vía, qué se hizo y, si cambió una decisión del documento maestro, cuál.
 
+## 2026-11-16
+- Fase F1a-analisis implementada (8 de 8 tareas), pendiente de revisión, demostración manual y pull request: contrato `AudioFeatures` en zod, `python -m analysis analyze`, `PythonAnalyzer`, validación de rutas, `analyze_audio`, `FakeAnalyzer`, servidor MCP por stdio y `.mcp.json`. CI con caché de pip.
+- Documento maestro v2.6: precisiones del contrato de análisis, códigos de salida y errores de dominio (8.1), firma de `AnalyzerPort.analyze` con `targetBpm` (6.4), excepción de zod en `core` (2.1), zod 4, TypeScript sin compilar y `check:full` (14.1), fase 1 partida en 1a y 1b (13). `compare_audio` y la caché pasan a F1b.
+- Decisión de F1a: para errores inesperados el servidor MCP devuelve `internal_error` (código de protocolo, fuera de la lista de `CopilotError`); el detalle solo va por stderr.
+
 ## 2026-11-15
 - Fase F0b cerrada: pull request #2 fusionada, CI en verde en la pull request y en `main`.
 - La fase 1 se parte en F1a (`analyze_audio` de punta a punta) y F1b (`compare_audio`, caché, trazas). zod queda permitido en `libs/core` (decisión del usuario; se aplica en F1a).

@@ -25,9 +25,15 @@ En caso de duda entre dos vías, elige la más ligera y sube si el cambio crece.
 ## Comandos
 
 - `pnpm check`: tipos, lint y pruebas unitarias de lo afectado. Debe tardar segundos. Es la verificación de cada tarea.
-- `pnpm check:full`: todo lo anterior en todo el repositorio, más pruebas de contrato y de Python. Se ejecuta al cerrar una fase.
+- `pnpm check:full`: todo lo anterior en todo el repositorio, más `py:test` y `test:contract` (Python real). Se ejecuta al cerrar una fase.
 - `pnpm py:setup`: crea `python/analysis/.venv` e instala el paquete. Se ejecuta una vez, antes de `pnpm check:full`.
+- `pnpm mcp:call <herramienta> '<json>'`: llama a una herramienta del servidor MCP por stdio, sin Claude Code.
 - `pnpm test:reaper`: integración con Reaper real. Solo en local, con Reaper abierto. Llega en la fase 2.
+
+## Servidor MCP
+
+- Se registra con `.mcp.json` en la raíz (`reaper-copilot`, `MODE=agent`). Claude Code pide aprobarlo la primera vez; `claude mcp list` lo comprueba.
+- Las rutas de audio van relativas a `workspace/` (ignorado por git, hay que crearlo) o absolutas dentro de él. `COPILOT_WORKSPACE` lo cambia; `MODE` por defecto es `mentor`.
 
 ## Estructura
 
