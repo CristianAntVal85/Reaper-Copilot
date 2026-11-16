@@ -5,14 +5,15 @@ Memoria entre sesiones. **Máximo 30 líneas, una idea por línea.** Lo que ya n
 Última actualización: 2026-11-16
 
 ## Dónde estamos
-- F1a cerrada (pull request #3). F1b-comparacion: plan aprobado en `specs/F1b-comparacion/plan.md`, en implementación, rama `fase/F1b-comparacion`.
-- Pendientes bajos: sin límite de tamaño ni memoria del audio; `invalid_analysis_output` genérico en `server.ts`; `MODE=agent` de `.mcp.json` y `mcp:call` en `mentor` al llegar la escritura (fase 2); cola de un solo análisis para Live.
+- F1a cerrada (pull request #3). F1b-comparacion implementada (8 de 8 tareas) en la rama `fase/F1b-comparacion`; plan en `specs/F1b-comparacion/plan.md`.
+- Pendientes bajos: sin límite de tamaño ni memoria del audio; `MODE=agent` de `.mcp.json` y `mcp:call` en `mentor` al llegar la escritura (fase 2); cola de un solo análisis para Live.
 
 ## Siguiente paso
-- Implementar T1-T8 de F1b con `/sdd-implement F1b-comparacion`.
+- Ejecutar `/sdd-validate F1b-comparacion` (reviewer y reviewer-security: rutas, SQLite, trazas).
+- Demostración (pasos 2 a 6 del plan; el 6 lo hace el usuario en una sesión nueva de Claude Code) y pull request a `main`.
 
 ## Hecho
-- Fases 0, F0b y F1a cerradas (spikes, monorepo Nx, CI, `analyze_audio` por MCP); diseño en `docs/reaper-copilot.md` v2.6. Detalle en `docs/CHANGELOG.md`.
+- Fases 0, F0b y F1a cerradas (spikes, monorepo Nx, CI, `analyze_audio` por MCP); diseño en `docs/reaper-copilot.md` v2.7. Detalle en `docs/CHANGELOG.md`.
 
 ## Pendiente de decidir (usuario)
 - Idioma del README y de la interfaz del Replay.
@@ -26,3 +27,4 @@ Memoria entre sesiones. **Máximo 30 líneas, una idea por línea.** Lo que ya n
 - El portátil servidor es un Intel i3 con 8 GB y Ubuntu.
 - TypeScript está en 6.0 porque `typescript-eslint` 8 exige `typescript` menor que 6.1.
 - pnpm 12 bloquea los scripts de build de las dependencias: se declaran en `allowBuilds` de `pnpm-workspace.yaml`.
+- Al cambiar el método de análisis de Python hay que subir `ANALYSIS_REVISION` (`libs/core`) o borrar `.copilot/`.
