@@ -1,8 +1,10 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { spawn } from "node:child_process";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { asAssetPath, CopilotError, ProjectStateSchema, type JobStatus } from "@reaper-copilot/core";
 import { afterAll, describe, expect, it } from "vitest";
+import { type PathOptions, toDawPath } from "./paths.ts";
 import { ReaperDaw } from "./reaper-daw.ts";
 import { readWavDuration } from "./wav.ts";
 
@@ -57,6 +59,71 @@ function clickTrack(bpm: number, bars: number, leadSec: number, sampleRate = 220
 
 let tmp: string | undefined;
 
+const DISTRO = process.env["WSL_DISTRO_NAME"];
+const PATH_OPTIONS: PathOptions = DISTRO ? { style: "unc", distro: DISTRO } : { style: "identity" };
+const REAPER_EXE = process.env["COPILOT_REAPER_EXE"]?.trim() || "/mnt/c/Program Files/REAPER (x64)/reaper.exe";
+
+/**
+ * Runs a throwaway ReaScript in the open Reaper (`-nonewinst`, as reaper:bridge does) to set or read what the
+ * bridge's closed method list does not expose: item selection and the RENDER_* project settings.
+ * Returns the `key=value` lines the script wrote.
+ */
+async function probe(dir: string, name: string, itemId: string, set: boolean): Promise<Record<string, string>> {
+  const lua = (p: string): string => JSON.stringify(toDawPath(p, PATH_OPTIONS) ?? p);
+  const outFile = path.join(dir, `${name}.out`);
+  const script = path.join(dir, `${name}.lua`);
+  await writeFile(
+    script,
+    `local out, id, set = ${lua(outFile + ".tmp")}, ${JSON.stringify(itemId)}, ${set}
+local ok, err = pcall(function()
+local function guid(i) return reaper.BR_GetMediaItemGUID and reaper.BR_GetMediaItemGUID(i) or select(2, reaper.GetSetMediaItemInfo_String(i, "GUID", "", false)) end
+local target
+for i = 0, reaper.CountMediaItems(0) - 1 do
+  local it = reaper.GetMediaItem(0, i)
+  if guid(it) == id then target = it end
+end
+if set then
+  for i = 0, reaper.CountMediaItems(0) - 1 do reaper.SetMediaItemSelected(reaper.GetMediaItem(0, i), false) end
+  if target then reaper.SetMediaItemSelected(target, true) end
+  reaper.GetSetProjectInfo_String(0, "RENDER_FILE", "probe-dir", true)
+  reaper.GetSetProjectInfo_String(0, "RENDER_PATTERN", "probe-pattern", true)
+  reaper.GetSetProjectInfo(0, "RENDER_SETTINGS", 1, true)
+  reaper.GetSetProjectInfo(0, "RENDER_BOUNDSFLAG", 1, true)
+  reaper.GetSetProjectInfo(0, "RENDER_TAILFLAG", 1, true)
+end
+local lines = { "selected=" .. tostring(target ~= nil and reaper.IsMediaItemSelected(target)) }
+for _, k in ipairs({ "RENDER_FILE", "RENDER_PATTERN", "RENDER_FORMAT" }) do
+  local _, v = reaper.GetSetProjectInfo_String(0, k, "", false)
+  lines[#lines + 1] = k .. "=" .. v
+end
+for _, k in ipairs({ "RENDER_SETTINGS", "RENDER_BOUNDSFLAG", "RENDER_TAILFLAG" }) do
+  lines[#lines + 1] = k .. "=" .. string.format("%.0f", reaper.GetSetProjectInfo(0, k, 0, false))
+end
+local f = io.open(out, "wb")
+f:write(table.concat(lines, "\\n"))
+f:close()
+end)
+if not ok then
+  local f = io.open(out, "wb")
+  f:write("error=" .. tostring(err))
+  f:close()
+end
+os.rename(out, ${lua(outFile)})
+`,
+  );
+  const child = spawn(REAPER_EXE, ["-nonewinst", toDawPath(script, PATH_OPTIONS) ?? script], { stdio: "ignore", detached: true });
+  child.unref();
+  const deadline = Date.now() + 15_000;
+  for (;;) {
+    try {
+      const text = await readFile(outFile, "utf8");
+      return Object.fromEntries(text.split("\n").map((l) => [l.slice(0, l.indexOf("=")), l.slice(l.indexOf("=") + 1)]));
+    } catch {
+      if (Date.now() > deadline) throw new Error("the probe script did not answer");
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+  }
+}
 
 async function waitForJob(jobId: string): Promise<JobStatus> {
   const deadline = Date.now() + 60_000;
@@ -291,6 +358,32 @@ describe("Reaper bridge (real)", () => {
       expect((await daw.getProjectState()).tracks.length).toBe(before.tracks.length + 1);
     } finally {
       await restore(before.tracks.map((t) => t.id));
+    }
+  });
+
+  it("leaves item selection and render settings as they were after a render, and after a failed one", async () => {
+    await mkdir(WORKSPACE, { recursive: true });
+    tmp ??= await mkdtemp(path.join(WORKSPACE, "test-reaper-"));
+    const file = path.join(tmp, "restore.wav");
+    await writeFile(file, wav(1));
+    const output = path.join(tmp, "restore-out.wav");
+    const before = await daw.getProjectState();
+    try {
+      const { item } = await daw.importAudio(asAssetPath(file));
+      const known = await probe(tmp, "set", item.id, true);
+      expect(known).toMatchObject({ selected: "true", RENDER_PATTERN: "probe-pattern", RENDER_FILE: "probe-dir", RENDER_BOUNDSFLAG: "1" });
+
+      const job = await waitForJob(await daw.render(item.id, asAssetPath(output)));
+      expect(job.status).toBe("done");
+      expect(await probe(tmp, "after-ok", item.id, false)).toEqual(known);
+
+      // A failing render (the output already exists) must leave things as they were, too.
+      const failed = await waitForJob(await daw.render(item.id, asAssetPath(output)));
+      expect(failed.status).toBe("failed");
+      expect(await probe(tmp, "after-failed", item.id, false)).toEqual(known);
+    } finally {
+      await restore(before.tracks.map((t) => t.id));
+      await rm(output, { force: true });
     }
   });
 });

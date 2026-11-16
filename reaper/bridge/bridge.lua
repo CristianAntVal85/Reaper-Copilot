@@ -508,38 +508,62 @@ function methods.render(params)
   if reaper.file_exists(out) then fail("output_exists", "the output file already exists") end
 
   return undoable("render", function()
-    -- Put the media online; offline media renders as silence without any error.
-    reaper.Main_OnCommand(40182, 0) -- select all items
-    reaper.Main_OnCommand(40439, 0) -- set selected media online
-    reaper.Main_OnCommand(40289, 0) -- unselect all items
-    local source = reaper.GetMediaItemTake_Source(take)
-    if not source or reaper.GetMediaSourceLength(source) <= 0 then
-      fail("media_offline", "the item's source has no length")
+    -- Everything the render changes is saved first and restored afterwards, even if it fails.
+    local selected = {}
+    for i = 0, reaper.CountMediaItems(0) - 1 do
+      local it = reaper.GetMediaItem(0, i)
+      selected[#selected + 1] = { it, reaper.IsMediaItemSelected(it) }
     end
-
-    local position = reaper.GetMediaItemInfo_Value(item, "D_POSITION")
-    local length = reaper.GetMediaItemInfo_Value(item, "D_LENGTH")
-    if length <= 0 then fail("render_failed", "the item has no length") end
+    local saved_str, saved_num = {}, {}
+    for _, key in ipairs({ "RENDER_FILE", "RENDER_PATTERN", "RENDER_FORMAT" }) do
+      local _, v = reaper.GetSetProjectInfo_String(0, key, "", false)
+      saved_str[key] = v
+    end
+    for _, key in ipairs({ "RENDER_SETTINGS", "RENDER_BOUNDSFLAG", "RENDER_TAILFLAG" }) do
+      saved_num[key] = reaper.GetSetProjectInfo(0, key, 0, false)
+    end
     local prev_start, prev_end = reaper.GetSet_LoopTimeRange2(0, false, false, 0, 0, false)
-    reaper.GetSet_LoopTimeRange2(0, true, false, position, position + length, false)
-    reaper.GetSetProjectInfo_String(0, "RENDER_FILE", dir, true)
-    reaper.GetSetProjectInfo_String(0, "RENDER_PATTERN", name, true)
-    reaper.GetSetProjectInfo_String(0, "RENDER_FORMAT", "evaw", true) -- WAV
-    reaper.GetSetProjectInfo(0, "RENDER_SETTINGS", 0, true)           -- master mix
-    reaper.GetSetProjectInfo(0, "RENDER_BOUNDSFLAG", 2, true)         -- time selection
-    reaper.GetSetProjectInfo(0, "RENDER_TAILFLAG", 0, true)
 
-    state = "rendering"
-    write_heartbeat()
-    local ok, err = pcall(reaper.Main_OnCommand, 42230, 0) -- render, most recent settings, auto-close
-    state = "idle"
-    write_heartbeat()
-    last_beat = reaper.time_precise()
+    local ok, result = pcall(function()
+      -- Put the media online; offline media renders as silence without any error.
+      reaper.Main_OnCommand(40182, 0) -- select all items
+      reaper.Main_OnCommand(40439, 0) -- set selected media online
+      reaper.Main_OnCommand(40289, 0) -- unselect all items
+      local source = reaper.GetMediaItemTake_Source(take)
+      if not source or reaper.GetMediaSourceLength(source) <= 0 then
+        fail("media_offline", "the item's source has no length")
+      end
+
+      local position = reaper.GetMediaItemInfo_Value(item, "D_POSITION")
+      local length = reaper.GetMediaItemInfo_Value(item, "D_LENGTH")
+      if length <= 0 then fail("render_failed", "the item has no length") end
+      reaper.GetSet_LoopTimeRange2(0, true, false, position, position + length, false)
+      reaper.GetSetProjectInfo_String(0, "RENDER_FILE", dir, true)
+      reaper.GetSetProjectInfo_String(0, "RENDER_PATTERN", name, true)
+      reaper.GetSetProjectInfo_String(0, "RENDER_FORMAT", "evaw", true) -- WAV
+      reaper.GetSetProjectInfo(0, "RENDER_SETTINGS", 0, true)           -- master mix
+      reaper.GetSetProjectInfo(0, "RENDER_BOUNDSFLAG", 2, true)         -- time selection
+      reaper.GetSetProjectInfo(0, "RENDER_TAILFLAG", 0, true)
+
+      state = "rendering"
+      write_heartbeat()
+      local rendered, err = pcall(reaper.Main_OnCommand, 42230, 0) -- render, most recent settings, auto-close
+      state = "idle"
+      write_heartbeat()
+      last_beat = reaper.time_precise()
+      if not rendered then fail("render_failed", tostring(err)) end
+
+      if not reaper.file_exists(out) then fail("render_failed", "Reaper did not write the output file") end
+      return { lengthSec = length }
+    end)
+
     reaper.GetSet_LoopTimeRange2(0, true, false, prev_start, prev_end, false)
-    if not ok then fail("render_failed", tostring(err)) end
-
-    if not reaper.file_exists(out) then fail("render_failed", "Reaper did not write the output file") end
-    return { lengthSec = length }
+    for _, entry in ipairs(selected) do reaper.SetMediaItemSelected(entry[1], entry[2]) end
+    for key, v in pairs(saved_str) do reaper.GetSetProjectInfo_String(0, key, v, true) end
+    for key, v in pairs(saved_num) do reaper.GetSetProjectInfo(0, key, v, true) end
+    reaper.UpdateArrange()
+    if not ok then error(result, 0) end
+    return result
   end)
 end
 
