@@ -87,12 +87,14 @@ const textOf = (result: object): string => {
 };
 
 describe("MCP server", () => {
-  it("lists analyze_audio as read-only", async () => {
+  it("lists analyze_audio and compare_audio as read-only", async () => {
     const { client, close } = await connect({ mode: "mentor" });
     const { tools } = await client.listTools();
-    expect(tools.map((tool) => tool.name)).toEqual(["analyze_audio"]);
-    expect(tools[0]?.annotations?.readOnlyHint).toBe(true);
-    expect(tools[0]?.outputSchema).toBeDefined();
+    expect(tools.map((tool) => tool.name)).toEqual(["analyze_audio", "compare_audio"]);
+    for (const tool of tools) {
+      expect(tool.annotations?.readOnlyHint).toBe(true);
+      expect(tool.outputSchema).toBeDefined();
+    }
     await close();
   });
 

@@ -26,16 +26,23 @@ export class FakeAnalyzer implements AnalyzerPort {
   result: AudioFeatures;
   /** When set, `analyze` rejects with this error instead of returning `result`. */
   error: Error | undefined;
+  /** When set, picks the result per analyzed path instead of `result`. */
+  resultFor: ((path: AssetPath) => AudioFeatures) | undefined;
   readonly calls: AnalyzerCall[] = [];
 
-  constructor(init: { result?: AudioFeatures; error?: Error } = {}) {
+  constructor(init: {
+      result?: AudioFeatures;
+      error?: Error;
+      resultFor?: (path: AssetPath) => AudioFeatures;
+    } = {},) {
     this.result = init.result ?? SAMPLE_AUDIO_FEATURES;
     this.error = init.error;
+    this.resultFor = init.resultFor;
   }
 
   async analyze(path: AssetPath, options?: AnalyzeOptions): Promise<AudioFeatures> {
     this.calls.push({ path, options });
     if (this.error) throw this.error;
-    return this.result;
+    return this.resultFor ? this.resultFor(path) : this.result;
   }
 }
