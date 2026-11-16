@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import {
   CopilotError,
   type AppliedFxChain,
+  type AssetPath,
   type DawItem,
   type DawPort,
   type JobId,
@@ -13,15 +14,19 @@ import {
   type TrackRef,
 } from "@reaper-copilot/core";
 import type { z } from "zod";
-import { fromDawPath, type PathOptions, type PathStyle } from "./paths.ts";
+import { fromDawPath, toDawPath, type PathOptions, type PathStyle } from "./paths.ts";
 import {
   BRIDGE_PROTOCOL_VERSION,
+  BridgeImportResultSchema,
   BridgeProjectStateSchema,
   HeartbeatSchema,
   PingResultSchema,
   QuitResultSchema,
   ResponseSchema,
+  SetTempoResultSchema,
+  UndoResultSchema,
   translateBridgeError,
+  type BridgeItem,
   type BridgeMethod,
   type Heartbeat,
 } from "./protocol.ts";
@@ -102,23 +107,31 @@ export class ReaperDaw implements DawPort {
       lengthSec: raw.lengthSec,
       tracks: raw.tracks.map((track) => ({
         ...track,
-        items: track.items.map(
-          (item): DawItem => ({
-            ...item,
-            source: item.source === null ? null : fromDawPath(item.source, this.pathOptions),
-          }),
-        ),
+        items: track.items.map((item) => this.toDawItem(item)),
       })),
     };
   }
 
-  // Not bridged yet (T3-T6).
-  setTempo(): Promise<{ tempo: number }> {
-    return Promise.reject(notImplemented("setTempo"));
+  private toDawItem(item: BridgeItem): DawItem {
+    return { ...item, source: item.source === null ? null : fromDawPath(item.source, this.pathOptions) };
   }
-  importAudio(): Promise<{ track: TrackRef; item: DawItem }> {
-    return Promise.reject(notImplemented("importAudio"));
+
+  async setTempo(bpm: number): Promise<{ tempo: number }> {
+    return this.call("set_tempo", { bpm }, SetTempoResultSchema);
   }
+
+  async importAudio(file: AssetPath): Promise<{ track: TrackRef; item: DawItem }> {
+    const dawPath = toDawPath(file, this.pathOptions);
+    if (dawPath === null) {
+      throw new CopilotError("daw_error", "the file path cannot be mapped for Reaper", {
+        cause: new Error(`cannot translate ${file}`),
+      });
+    }
+    const raw = await this.call("import_audio", { path: dawPath }, BridgeImportResultSchema);
+    return { track: raw.track, item: this.toDawItem(raw.item) };
+  }
+
+  // Not bridged yet (T4-T6).
   sliceByBars(): Promise<DawItem> {
     return Promise.reject(notImplemented("sliceByBars"));
   }
@@ -134,8 +147,8 @@ export class ReaperDaw implements DawPort {
   getJob(): Promise<JobStatus> {
     return Promise.reject(notImplemented("getJob"));
   }
-  undo(): Promise<{ undone: string }> {
-    return Promise.reject(notImplemented("undo"));
+  async undo(): Promise<{ undone: string }> {
+    return this.call("undo", {}, UndoResultSchema);
   }
 
   // Transport ---------------------------------------------------------------

@@ -1,7 +1,7 @@
 import { mkdtemp, readdir, rm, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { CopilotError } from "@reaper-copilot/core";
+import { asAssetPath, CopilotError } from "@reaper-copilot/core";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { FakeBridge, type FakeBridgeHandler } from "./fake-bridge.ts";
 import { ReaperDaw } from "./reaper-daw.ts";
@@ -165,6 +165,39 @@ describe("ReaperDaw", () => {
   });
 
   it("fails clearly on commands that are not bridged yet", async () => {
-    expect(await code(daw().setTempo())).toBe("daw_error");
+    expect(await code(daw().sliceByBars())).toBe("daw_error");
+  });
+
+  it("imports audio with the path translated to UNC and the source back to Linux", async () => {
+    let seen: unknown;
+    handler = (_m, params) => {
+      seen = params;
+      return {
+        ok: true,
+        result: {
+          track: { id: TRACK, name: "a.wav" },
+          item: { id: ITEM, trackId: TRACK, positionSec: 0, lengthSec: 4, startOffsetSec: 0, playRate: 1, source: secret },
+        },
+      };
+    };
+    await bridge.start();
+    const out = await daw().importAudio(asAssetPath("/home/secret/a.wav"));
+    expect(seen).toEqual({ path: secret });
+    expect(out.track.name).toBe("a.wav");
+    expect(out.item.source).toBe("/home/secret/a.wav");
+  });
+
+  it("sets the tempo", async () => {
+    handler = () => ({ ok: true, result: { tempo: 170 } });
+    await bridge.start();
+    expect(await daw().setTempo(170)).toEqual({ tempo: 170 });
+  });
+
+  it("undoes and translates nothing_to_undo", async () => {
+    handler = () => ({ ok: true, result: { undone: "Copilot: set_tempo" } });
+    await bridge.start();
+    expect(await daw().undo()).toEqual({ undone: "Copilot: set_tempo" });
+    handler = () => ({ ok: false, error: { code: "nothing_to_undo", message: "x" } });
+    expect(await code(daw().undo())).toBe("nothing_to_undo");
   });
 });

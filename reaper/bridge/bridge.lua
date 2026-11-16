@@ -241,6 +241,69 @@ function methods.get_project_state()
   }
 end
 
+-- Runs `fn` as one undo block labelled "Copilot: <action>"; the block is closed even if `fn` fails.
+local function undoable(action, fn)
+  reaper.Undo_BeginBlock()
+  local ok, result = pcall(fn)
+  reaper.Undo_EndBlock("Copilot: " .. action, -1)
+  if not ok then error(result, 0) end
+  return result
+end
+
+local function track_ref(track)
+  local _, name = reaper.GetTrackName(track)
+  return { id = reaper.GetTrackGUID(track), name = name }
+end
+
+function methods.import_audio(params)
+  local path = params.path
+  if type(path) ~= "string" or path == "" then fail("invalid_params", "path must be a non-empty string") end
+  -- Without this check a path Reaper cannot read becomes an empty item and no error.
+  if not reaper.file_exists(path) then fail("file_not_found", "file does not exist") end
+  return undoable("import_audio", function()
+    local index = reaper.CountTracks(0)
+    reaper.InsertTrackAtIndex(index, true)
+    local track = reaper.GetTrack(0, index)
+    if not track then fail("internal", "could not create the track") end
+    local function abort(code, message)
+      reaper.DeleteTrack(track)
+      fail(code, message)
+    end
+    reaper.GetSetMediaTrackInfo_String(track, "P_NAME", path:match("[^/\\]+$") or "audio", true)
+    reaper.SetOnlyTrackSelected(track)
+    reaper.SetEditCurPos(0, false, false)
+    reaper.InsertMedia(path, 0)
+    if reaper.CountTrackMediaItems(track) < 1 then abort("internal", "Reaper did not create an item") end
+    local item = reaper.GetTrackMediaItem(track, 0)
+    if not item or reaper.GetMediaItemInfo_Value(item, "D_LENGTH") <= 0 then
+      abort("internal", "the imported item is empty")
+    end
+    -- Time timebase right away: with the project default, a later tempo change stretches the item.
+    reaper.SetMediaItemInfo_Value(item, "C_BEATATTACHMODE", 0)
+    return { track = track_ref(track), item = item_info(item, reaper.GetTrackGUID(track)) }
+  end)
+end
+
+function methods.set_tempo(params)
+  local bpm = params.bpm
+  if type(bpm) ~= "number" or bpm ~= bpm then fail("invalid_params", "bpm must be a number") end
+  if bpm < 40 or bpm > 320 then fail("out_of_range", "bpm must lie within [40, 320]") end
+  return undoable("set_tempo", function()
+    reaper.SetCurrentBPM(0, bpm, true)
+    return { tempo = reaper.Master_GetTempo() }
+  end)
+end
+
+-- Only undoes the copilot's own blocks: never the user's work.
+function methods.undo()
+  local label = reaper.Undo_CanUndo2(0)
+  if type(label) ~= "string" or label:sub(1, 9) ~= "Copilot: " then
+    fail("nothing_to_undo", "the last undo step is not the copilot's")
+  end
+  if reaper.Undo_DoUndo2(0) == 0 then fail("internal", "Reaper did not undo") end
+  return { undone = label }
+end
+
 function methods.quit()
   running = false
   return { bye = true }

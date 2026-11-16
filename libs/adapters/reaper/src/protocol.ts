@@ -1,10 +1,10 @@
-import { CopilotError, type CopilotErrorCode, ProjectStateSchema } from "@reaper-copilot/core";
+import { CopilotError, type CopilotErrorCode, ProjectStateSchema, TrackRefSchema } from "@reaper-copilot/core";
 import { z } from "zod";
 
 /** Version of the request envelope; the bridge refuses any other. */
 export const BRIDGE_PROTOCOL_VERSION = 1;
 
-export const BRIDGE_METHODS = ["ping", "get_project_state", "quit"] as const;
+export const BRIDGE_METHODS = ["ping", "get_project_state", "import_audio", "set_tempo", "undo", "quit"] as const;
 export type BridgeMethod = (typeof BRIDGE_METHODS)[number];
 
 export const BRIDGE_ERROR_CODES = [
@@ -47,6 +47,20 @@ export const PingResultSchema = z.object({
   reaper: z.string(),
 });
 export type PingResult = z.infer<typeof PingResultSchema>;
+
+export const BridgeItemSchema = ProjectStateSchema.shape.tracks.element.shape.items.element
+  .omit({ source: true })
+  .extend({ source: z.string().nullable() });
+
+export type BridgeItem = z.infer<typeof BridgeItemSchema>;
+
+export const BridgeImportResultSchema = z.object({
+  track: TrackRefSchema,
+  item: BridgeItemSchema,
+});
+
+export const SetTempoResultSchema = z.object({ tempo: z.number().finite().positive() });
+export const UndoResultSchema = z.object({ undone: z.string().min(1) });
 
 export const QuitResultSchema = z.object({ bye: z.literal(true) });
 
