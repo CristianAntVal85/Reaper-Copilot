@@ -57,9 +57,10 @@ export default tseslint.config(
     },
   },
   {
-    // Constitution rule 6: core production code imports nothing external.
-    // Bare specifiers ('zod', 'node:fs', '@scope/pkg') are banned; relative paths are fine.
-    // The regex matches every specifier that is not relative: npm packages and Node modules alike.
+    // Constitution rule 6: core production code imports nothing external except zod
+    // (the single exception, decided in F1a). Other bare specifiers ('node:fs', '@scope/pkg')
+    // are banned; relative paths are fine. The regex matches every non-relative specifier
+    // other than exactly 'zod': npm packages and Node modules alike.
     files: ["libs/core/**/*.{ts,mts,cts,js,mjs,cjs}"],
     ignores: ["libs/core/**/*.test.{ts,mts,cts,js,mjs,cjs}"],
     rules: {
@@ -68,9 +69,9 @@ export default tseslint.config(
         {
           patterns: [
             {
-              regex: "^[^./]",
+              regex: "^(?!zod$)[^./]",
               message:
-                "libs/core must not import external packages or Node modules (constitution, rule 6).",
+                "libs/core may import only zod and relative paths (constitution, rule 6).",
             },
           ],
         },
@@ -78,7 +79,7 @@ export default tseslint.config(
     },
   },
   {
-    // Core tests may import only vitest (plus relative paths).
+    // Core tests may import only vitest and zod (plus relative paths).
     files: ["libs/core/**/*.test.{ts,mts,cts,js,mjs,cjs}"],
     rules: {
       "no-restricted-imports": [
@@ -86,9 +87,9 @@ export default tseslint.config(
         {
           patterns: [
             {
-              regex: "^(?!vitest$)[^./]",
+              regex: "^(?!(?:vitest|zod)$)[^./]",
               message:
-                "Tests in libs/core may import only vitest and relative paths (constitution, rule 6).",
+                "Tests in libs/core may import only vitest, zod and relative paths (constitution, rule 6).",
             },
           ],
         },

@@ -102,7 +102,7 @@ Riesgos:
 
 ## 5. Tareas
 
-- [ ] **T1. Contrato en `core` y excepción de zod.** `AudioFeaturesSchema` y su tipo, `AssetPath` (tipo marcado), `AnalyzerPort`, `CopilotError` con la lista cerrada de códigos. `zod` como dependencia de `libs/core`. Constitución, regla 6: zod como única excepción. Lint: `core` admite `zod` y nada más. `tsconfig.base.json`: `allowImportingTsExtensions` y `erasableSyntaxOnly`; imports relativos con `.ts`.
+- [x] **T1. Contrato en `core` y excepción de zod.** `AudioFeaturesSchema` y su tipo, `AssetPath` (tipo marcado), `AnalyzerPort`, `CopilotError` con la lista cerrada de códigos. `zod` como dependencia de `libs/core`. Constitución, regla 6: zod como única excepción. Lint: `core` admite `zod` y nada más. `tsconfig.base.json`: `allowImportingTsExtensions` y `erasableSyntaxOnly`; imports relativos con `.ts`.
   - Hecho cuando: el esquema acepta el JSON de ejemplo de la sección 2 y rechaza variantes (campo ausente, `bpm` como texto, `schemaVersion` 2, `tonic` inválida, número no finito); `import 'node:fs'` en `core` sigue fallando en lint y `import { z } from 'zod'` pasa; `node libs/core/src/index.ts` termina sin error.
 - [ ] **T2. Python: `analyze` con archivo y tempo.** Subcomando `analyze <ruta> [--target-bpm N]`, datos del archivo y tempo con el método de la sección 2. Dependencias: `librosa`, `numpy`, `scipy`, `soundfile`. Códigos de salida y mensajes de error.
   - Hecho cuando: con pistas de clics generadas en la prueba a 150, 174 y 200 BPM, el tempo sale a ±0,5 BPM con y sin objetivo; `alternatives` es mitad y doble; ruido blanco da confianza menor de 0,10; un archivo inexistente sale con código 2 y uno que no es audio con código 3.

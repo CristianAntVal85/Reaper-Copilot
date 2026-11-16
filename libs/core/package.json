@@ -15,5 +15,8 @@
     "tags": [
       "scope:core"
     ]
+  },
+  "dependencies": {
+    "zod": "^4.6.7"
   }
 }
