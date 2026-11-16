@@ -5,16 +5,15 @@ Memoria entre sesiones. **Máximo 30 líneas, una idea por línea.** Lo que ya n
 Última actualización: 2026-11-16
 
 ## Dónde estamos
-- F1a-analisis implementada (8 de 8 tareas) en `fase/F1a-analisis`, sin push; plan en `specs/F1a-analisis/plan.md`. La revisión dio CAMBIOS NECESARIOS por un hallazgo medio (rutas y stderr hacia el cliente); corregido, pendiente de re-revisión de seguridad.
+- F1a-analisis cerrada y fusionada (pull request #3). Rama nueva `fase/F1b-comparacion`, sin plan todavía.
 - Pendientes bajos: sin límite de tamaño ni memoria del audio; `invalid_analysis_output` genérico en `server.ts`; `MODE=agent` de `.mcp.json` y `mcp:call` en `mentor` al llegar la escritura (fase 2); cola de un solo análisis para Live.
 
 ## Siguiente paso
-- Re-revisión de seguridad de F1a-analisis (`reviewer-security`).
-- Demostración, paso 5 (usuario, a mano): aprobar el servidor en sesión nueva de terminal y de VS Code, y pedir un análisis.
-- Push y pull request a `main` con el CI en verde. Después, F1b (`compare_audio`, caché, trazas).
+- `/sdd-plan F1b-comparacion`: `compare_audio`, caché por sha256 y trazas en SQLite.
+- Demostración de F1a, paso 5 (usuario, a mano): aprobar el servidor en sesión nueva de terminal y de VS Code, y pedir un análisis.
 
 ## Hecho
-- Fases 0 y F0b cerradas (spikes, monorepo Nx, CI); diseño en `docs/reaper-copilot.md` v2.6. Detalle en `docs/CHANGELOG.md`.
+- Fases 0, F0b y F1a cerradas (spikes, monorepo Nx, CI, `analyze_audio` por MCP); diseño en `docs/reaper-copilot.md` v2.6. Detalle en `docs/CHANGELOG.md`.
 
 ## Pendiente de decidir (usuario)
 - Idioma del README y de la interfaz del Replay.
