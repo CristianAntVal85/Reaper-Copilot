@@ -2,18 +2,18 @@
 
 Memoria entre sesiones. **Máximo 30 líneas, una idea por línea.** Lo que ya no sirva para decidir el siguiente paso se mueve a `docs/CHANGELOG.md`. Sin recuentos de pruebas: se obtienen ejecutando `pnpm check:full`.
 
-Última actualización: 2026-11-15
+Última actualización: 2026-11-16
 
 ## Dónde estamos
-- Fase F0b-andamiaje implementada (7 de 7 tareas), revisada (APROBADO) y con las correcciones aplicadas.
-- Rama: `fase/F0b-andamiaje`, sin push.
+- Fase F1a-analisis: plan aprobado en `specs/F1a-analisis/plan.md`, en implementación.
+- Rama: `fase/F1a-analisis`, sin push.
 
 ## Siguiente paso
-- Push, pull request a `main` (ahí se comprueba el CI) y fusión; después, `/sdd-plan` de la fase 1.
+- Implementar T1-T8 con `/sdd-implement F1a-analisis`. Después, F1b (`compare_audio`, caché, trazas).
 
 ## Hecho
 - Fase 0: los tres spikes funcionan (puente de Reaper, MCP mínimo, tempo con librosa). Detalle en `docs/CHANGELOG.md` y `specs/spikes/`.
-- Fase F0b: monorepo Nx con pnpm, `pnpm check` y `pnpm check:full`, esqueleto de Python y CI.
+- Fase F0b cerrada y fusionada (CI en verde): monorepo Nx con pnpm, `pnpm check`, `pnpm check:full`, esqueleto de Python.
 - Diseño en `docs/reaper-copilot.md` v2.5.
 
 ## Pendiente de decidir (usuario)

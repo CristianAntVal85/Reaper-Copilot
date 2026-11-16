@@ -3,6 +3,8 @@
 Entradas nuevas arriba. Una línea por cambio relevante: fecha, fase o vía, qué se hizo y, si cambió una decisión del documento maestro, cuál.
 
 ## 2026-11-15
+- Fase F0b cerrada: pull request #2 fusionada, CI en verde en la pull request y en `main`.
+- La fase 1 se parte en F1a (`analyze_audio` de punta a punta) y F1b (`compare_audio`, caché, trazas). zod queda permitido en `libs/core` (decisión del usuario; se aplica en F1a).
 - Documento maestro v2.5: stack concretado, con Node 24 en lugar de «20 o superior», TypeScript 6, pnpm, ESLint y Vitest. Sección 14.1. La sección 11.3 decía «Node LTS»: ahora dice Node 24, sin subir la versión del documento.
 - Fase F0b implementada y revisada, pendiente del CI en la pull request y de la fusión (el cierre se anotará al fusionar): monorepo Nx con pnpm, `pnpm check` y `pnpm check:full`, esqueleto de `python/analysis` y CI en un job.
 
