@@ -165,7 +165,7 @@ describe("ReaperDaw", () => {
   });
 
   it("fails clearly on commands that are not bridged yet", async () => {
-    expect(await code(daw().sliceByBars())).toBe("daw_error");
+    expect(await code(daw().applyFxChain())).toBe("daw_error");
   });
 
   it("imports audio with the path translated to UNC and the source back to Linux", async () => {
@@ -191,6 +191,27 @@ describe("ReaperDaw", () => {
     handler = () => ({ ok: true, result: { tempo: 170 } });
     await bridge.start();
     expect(await daw().setTempo(170)).toEqual({ tempo: 170 });
+  });
+
+  it("slices and stretches with the full parameters and translates errors", async () => {
+    const seen: { method: string; params: unknown }[] = [];
+    const item = { id: ITEM, trackId: TRACK, positionSec: 0, lengthSec: 6.4, startOffsetSec: 6.9, playRate: 1, source: null };
+    handler = (method, params) => {
+      seen.push({ method, params });
+      return { ok: true, result: item };
+    };
+    await bridge.start();
+    const d = daw();
+    expect((await d.sliceByBars(ITEM, { sourceBpm: 150, startBar: 5, bars: 4, offsetSec: 0.5 })).lengthSec).toBe(6.4);
+    await d.stretchToTempo(ITEM, { sourceBpm: 150, targetBpm: 170 });
+    expect(seen).toEqual([
+      { method: "slice", params: { itemId: ITEM, sourceBpm: 150, startBar: 5, bars: 4, beatsPerBar: 4, offsetSec: 0.5 } },
+      { method: "stretch", params: { itemId: ITEM, sourceBpm: 150, targetBpm: 170 } },
+    ]);
+    handler = () => ({ ok: false, error: { code: "out_of_range", message: "x" } });
+    expect(await code(d.stretchToTempo(ITEM, { sourceBpm: 150, targetBpm: 320 }))).toBe("out_of_range");
+    handler = () => ({ ok: false, error: { code: "item_not_found", message: "x" } });
+    expect(await code(d.sliceByBars(ITEM, { sourceBpm: 150, startBar: 1, bars: 1 }))).toBe("item_not_found");
   });
 
   it("undoes and translates nothing_to_undo", async () => {

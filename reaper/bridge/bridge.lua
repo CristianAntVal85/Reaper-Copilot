@@ -294,6 +294,79 @@ function methods.set_tempo(params)
   end)
 end
 
+local function find_item(id)
+  if type(id) ~= "string" or id == "" then fail("invalid_params", "itemId must be a non-empty string") end
+  for i = 0, reaper.CountMediaItems(0) - 1 do
+    local item = reaper.GetMediaItem(0, i)
+    if item and item_guid(item) == id then
+      local take = reaper.GetActiveTake(item)
+      if not take then fail("item_not_found", "the item has no take") end
+      return item, take
+    end
+  end
+  fail("item_not_found", "no item with that id")
+end
+
+local function item_info_of(item)
+  return item_info(item, reaper.GetTrackGUID(reaper.GetMediaItem_Track(item)))
+end
+
+local function number_param(params, name, min, max, integer)
+  local v = params[name]
+  if type(v) ~= "number" or v ~= v or v == math.huge or v == -math.huge then
+    fail("invalid_params", name .. " must be a finite number")
+  end
+  if integer and v ~= math.floor(v) then fail("invalid_params", name .. " must be an integer") end
+  if (min and v < min) or (max and v > max) then fail("invalid_params", name .. " is out of bounds") end
+  return v
+end
+
+-- Cuts by moving the take's start offset (no SplitMediaItem: it adds a fade). All values are absolute,
+-- so repeating the call gives the same result.
+function methods.slice(params)
+  local source_bpm = number_param(params, "sourceBpm", 60, 320)
+  local start_bar = number_param(params, "startBar", 1, nil, true)
+  local bars = number_param(params, "bars", 1, 64, true)
+  local beats_per_bar = number_param(params, "beatsPerBar", 1, 16, true)
+  local offset_sec = number_param(params, "offsetSec", 0, nil)
+  local item, take = find_item(params.itemId)
+  local source = reaper.GetMediaItemTake_Source(take)
+  local source_length = source and reaper.GetMediaSourceLength(source) or 0
+  if source_length <= 0 then fail("media_offline", "the item's source has no length") end
+  local bar_sec = beats_per_bar * 60 / source_bpm
+  local start_offs = offset_sec + (start_bar - 1) * bar_sec
+  if start_offs + bars * bar_sec > source_length + 1e-6 then
+    fail("out_of_range", "the slice goes past the end of the source")
+  end
+  return undoable("slice_loop", function()
+    local rate = reaper.GetMediaItemTakeInfo_Value(take, "D_PLAYRATE")
+    if rate <= 0 then fail("internal", "invalid play rate") end
+    reaper.SetMediaItemTakeInfo_Value(take, "D_STARTOFFS", start_offs)
+    reaper.SetMediaItemInfo_Value(item, "D_POSITION", 0)
+    reaper.SetMediaItemInfo_Value(item, "D_LENGTH", bars * bar_sec / rate)
+    reaper.UpdateArrange()
+    return item_info_of(item)
+  end)
+end
+
+-- Idempotent: the length at rate 1 is recovered from the current length and rate.
+function methods.stretch(params)
+  local source_bpm = number_param(params, "sourceBpm", 60, 320)
+  local target_bpm = number_param(params, "targetBpm", 60, 320)
+  local item, take = find_item(params.itemId)
+  local rate = target_bpm / source_bpm
+  if rate < 0.5 or rate > 2 then fail("out_of_range", "the playback rate must lie within [0.5, 2]") end
+  return undoable("time_stretch", function()
+    local old_rate = reaper.GetMediaItemTakeInfo_Value(take, "D_PLAYRATE")
+    local length_at_unit = reaper.GetMediaItemInfo_Value(item, "D_LENGTH") * old_rate
+    reaper.SetMediaItemTakeInfo_Value(take, "B_PPITCH", 1)
+    reaper.SetMediaItemTakeInfo_Value(take, "D_PLAYRATE", rate)
+    reaper.SetMediaItemInfo_Value(item, "D_LENGTH", length_at_unit / rate)
+    reaper.UpdateArrange()
+    return item_info_of(item)
+  end)
+end
+
 -- Only undoes the copilot's own blocks: never the user's work.
 function methods.undo()
   local label = reaper.Undo_CanUndo2(0)

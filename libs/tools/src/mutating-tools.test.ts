@@ -6,6 +6,8 @@ import { FakeAnalyzer, FakeDaw, FakeStorage } from "@reaper-copilot/testing";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { importAudio } from "./import-audio.ts";
 import { setTempo } from "./set-tempo.ts";
+import { sliceLoop } from "./slice-loop.ts";
+import { timeStretch } from "./time-stretch.ts";
 import type { ToolContext } from "./tool-definition.ts";
 import { undoLast } from "./undo-last.ts";
 
@@ -76,5 +78,63 @@ describe("undo_last", () => {
     expect(error).toBeInstanceOf(CopilotError);
     expect(error).toMatchObject({ code: "nothing_to_undo" });
     expect(undoLast.risk).toBe("write");
+  });
+});
+
+describe("slice_loop and time_stretch", () => {
+  async function imported(daw: FakeDaw): Promise<string> {
+    const out = await importAudio.handler({ path: "demo/loop.wav" }, context(daw));
+    return out.item.id;
+  }
+
+  it("slices with defaults, relative source, and is idempotent", async () => {
+    const daw = new FakeDaw();
+    daw.defaultSourceLengthSec = 30;
+    const itemId = await imported(daw);
+    const input = sliceLoop.inputSchema.parse({ itemId, sourceBpm: 150, startBar: 5, bars: 4, offsetSec: 0.5 });
+    expect(input.beatsPerBar).toBe(4);
+    const first = sliceLoop.outputSchema.parse(await sliceLoop.handler(input, context(daw)));
+    const second = await sliceLoop.handler(input, context(daw));
+    expect(second).toEqual(first);
+    expect(first.startOffsetSec).toBeCloseTo(0.5 + 4 * 1.6, 9);
+    expect(first.lengthSec).toBeCloseTo(6.4, 9);
+    expect(first.source).toBe("demo/loop.wav");
+    expect(sliceLoop.risk).toBe("write");
+  });
+
+  it("limits the slice input and reports out_of_range past the source", async () => {
+    const shape = { itemId: "{AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE}", sourceBpm: 150, startBar: 1, bars: 4 };
+    expect(sliceLoop.inputSchema.safeParse(shape).success).toBe(true);
+    for (const bad of [{ startBar: 0 }, { bars: 65 }, { sourceBpm: 59 }, { beatsPerBar: 17 }, { offsetSec: -1 }, { itemId: "x" }]) {
+      expect(sliceLoop.inputSchema.safeParse({ ...shape, ...bad }).success).toBe(false);
+    }
+    const daw = new FakeDaw();
+    daw.defaultSourceLengthSec = 10;
+    const itemId = await imported(daw);
+    await expect(
+      sliceLoop.handler(sliceLoop.inputSchema.parse({ ...shape, itemId, startBar: 5 }), context(daw)),
+    ).rejects.toMatchObject({ code: "out_of_range" });
+  });
+
+  it("stretches idempotently and rejects a rate outside [0.5, 2]", async () => {
+    const daw = new FakeDaw();
+    daw.defaultSourceLengthSec = 30;
+    const itemId = await imported(daw);
+    await sliceLoop.handler(sliceLoop.inputSchema.parse({ itemId, sourceBpm: 150, startBar: 5, bars: 4, offsetSec: 0.5 }), context(daw));
+    const input = { itemId, sourceBpm: 150, targetBpm: 170 };
+    const first = timeStretch.outputSchema.parse(await timeStretch.handler(input, context(daw)));
+    expect(first.lengthSec).toBeCloseTo(5.647059, 5);
+    expect(await timeStretch.handler(input, context(daw))).toEqual(first);
+    await expect(timeStretch.handler({ ...input, targetBpm: 320 }, context(daw))).rejects.toMatchObject({
+      code: "out_of_range",
+    });
+    expect(timeStretch.risk).toBe("write");
+  });
+
+  it("need a DAW", async () => {
+    const id = "{AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE}";
+    await expect(timeStretch.handler({ itemId: id, sourceBpm: 150, targetBpm: 170 }, context())).rejects.toMatchObject({
+      code: "daw_unavailable",
+    });
   });
 });

@@ -33,6 +33,27 @@ function wav(seconds: number, sampleRate = 8000): Buffer {
   return Buffer.concat([header, data]);
 }
 
+/** Click track: 0.5 s of silence, then 4/4 clicks at `bpm`, the first beat of each bar accented. */
+function clickTrack(bpm: number, bars: number, leadSec: number, sampleRate = 22050): Buffer {
+  const beatSec = 60 / bpm;
+  const total = Math.round((leadSec + bars * 4 * beatSec) * sampleRate);
+  const data = Buffer.alloc(total * 2);
+  for (let beat = 0; beat < bars * 4; beat++) {
+    const start = Math.round((leadSec + beat * beatSec) * sampleRate);
+    const amp = beat % 4 === 0 ? 24000 : 12000;
+    const freq = beat % 4 === 0 ? 1500 : 1000;
+    for (let i = 0; i < 0.02 * sampleRate && start + i < total; i++) {
+      const v = amp * Math.exp(-i / (0.004 * sampleRate)) * Math.sin((2 * Math.PI * freq * i) / sampleRate);
+      data.writeInt16LE(Math.round(v), (start + i) * 2);
+    }
+  }
+  const header = Buffer.from(wav(0, sampleRate).subarray(0, 44));
+  header.writeUInt32LE(36 + data.length, 4);
+  header.writeUInt32LE(sampleRate * 2, 28);
+  header.writeUInt32LE(data.length, 40);
+  return Buffer.concat([header, data]);
+}
+
 let tmp: string | undefined;
 afterAll(async () => {
   if (tmp) await rm(tmp, { recursive: true, force: true });
@@ -78,5 +99,45 @@ describe("Reaper bridge (real)", () => {
     const third = await daw.undo().catch((e: unknown) => e);
     expect(third).toBeInstanceOf(CopilotError);
     expect(third).toMatchObject({ code: "nothing_to_undo" });
+  });
+
+  it("slices bars 5-8 and stretches to 170 (absolute, idempotent), then undoes", async () => {
+    await mkdir(WORKSPACE, { recursive: true });
+    tmp ??= await mkdtemp(path.join(WORKSPACE, "test-reaper-"));
+    const file = path.join(tmp, "click.wav");
+    await writeFile(file, clickTrack(150, 16, 0.5));
+
+    const before = await daw.getProjectState();
+    const { item } = await daw.importAudio(asAssetPath(file));
+    const spec = { sourceBpm: 150, startBar: 5, bars: 4, offsetSec: 0.5 };
+
+    const sliced = await daw.sliceByBars(item.id, spec);
+    expect(sliced.startOffsetSec).toBeCloseTo(0.5 + 4 * 1.6, 6);
+    expect(sliced.lengthSec).toBeCloseTo(6.4, 6);
+    expect(sliced.positionSec).toBe(0);
+    expect(await daw.sliceByBars(item.id, spec)).toEqual(sliced);
+
+    const stretch = { sourceBpm: 150, targetBpm: 170 };
+    const stretched = await daw.stretchToTempo(item.id, stretch);
+    expect(Math.abs(stretched.lengthSec - 5.647059)).toBeLessThan(0.001);
+    expect(stretched.playRate).toBeCloseTo(170 / 150, 9);
+    expect(await daw.stretchToTempo(item.id, stretch)).toEqual(stretched);
+    expect(await daw.sliceByBars(item.id, spec)).toMatchObject({ lengthSec: expect.closeTo(6.4 / (170 / 150), 6) });
+    expect(await daw.stretchToTempo(item.id, stretch)).toEqual(stretched);
+
+    const outOfSource = await daw.sliceByBars(item.id, { ...spec, startBar: 15 }).catch((e: unknown) => e);
+    expect(outOfSource).toMatchObject({ code: "out_of_range" });
+    const badRate = await daw.stretchToTempo(item.id, { sourceBpm: 100, targetBpm: 320 }).catch((e: unknown) => e);
+    expect(badRate).toMatchObject({ code: "out_of_range" });
+    const unknown = await daw
+      .sliceByBars("{00000000-0000-0000-0000-000000000000}", spec)
+      .catch((e: unknown) => e);
+    expect(unknown).toMatchObject({ code: "item_not_found" });
+
+    // Every slice and stretch above is one undo step; undo until the import is gone.
+    let undone = (await daw.undo()).undone;
+    while (undone !== "Copilot: import_audio") undone = (await daw.undo()).undone;
+    const restored = await daw.getProjectState();
+    expect(restored.tracks.map((t) => t.id)).toEqual(before.tracks.map((t) => t.id));
   });
 });

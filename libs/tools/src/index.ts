@@ -7,6 +7,8 @@ export * from "./invoke-tool.ts";
 export * from "./item-info.ts";
 export * from "./registry.ts";
 export * from "./set-tempo.ts";
+export * from "./slice-loop.ts";
+export * from "./time-stretch.ts";
 export * from "./resolve-asset-path.ts";
 export * from "./tool-definition.ts";
 export * from "./undo-last.ts";

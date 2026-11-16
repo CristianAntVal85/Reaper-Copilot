@@ -8,9 +8,13 @@ import {
   type AssetPath,
   type DawItem,
   type DawPort,
+  type ItemId,
   type JobId,
   type JobStatus,
   type ProjectState,
+  SliceSpecSchema,
+  type SliceSpec,
+  type StretchSpec,
   type TrackRef,
 } from "@reaper-copilot/core";
 import type { z } from "zod";
@@ -18,6 +22,7 @@ import { fromDawPath, toDawPath, type PathOptions, type PathStyle } from "./path
 import {
   BRIDGE_PROTOCOL_VERSION,
   BridgeImportResultSchema,
+  BridgeItemResultSchema,
   BridgeProjectStateSchema,
   HeartbeatSchema,
   PingResultSchema,
@@ -131,13 +136,22 @@ export class ReaperDaw implements DawPort {
     return { track: raw.track, item: this.toDawItem(raw.item) };
   }
 
-  // Not bridged yet (T4-T6).
-  sliceByBars(): Promise<DawItem> {
-    return Promise.reject(notImplemented("sliceByBars"));
+  async sliceByBars(itemId: ItemId, spec: SliceSpec): Promise<DawItem> {
+    const parsed = SliceSpecSchema.parse(spec);
+    const raw = await this.call("slice", { itemId, ...parsed }, BridgeItemResultSchema);
+    return this.toDawItem(raw);
   }
-  stretchToTempo(): Promise<DawItem> {
-    return Promise.reject(notImplemented("stretchToTempo"));
+
+  async stretchToTempo(itemId: ItemId, spec: StretchSpec): Promise<DawItem> {
+    const raw = await this.call(
+      "stretch",
+      { itemId, sourceBpm: spec.sourceBpm, targetBpm: spec.targetBpm },
+      BridgeItemResultSchema,
+    );
+    return this.toDawItem(raw);
   }
+
+  // Not bridged yet (T5-T6).
   applyFxChain(): Promise<AppliedFxChain> {
     return Promise.reject(notImplemented("applyFxChain"));
   }
