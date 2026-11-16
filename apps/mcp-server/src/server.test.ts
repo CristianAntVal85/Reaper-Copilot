@@ -66,8 +66,13 @@ async function connect(options: {
   const registry = createToolRegistry([...ALL_TOOLS, ...(options.extraTools ?? [])], options.mode);
   const server = createServer({
     registry,
-    context: { workspaceRoot: ws, analyzer, storage: new FakeStorage(), log: () => {} },
-    log: options.log ?? (() => {}),
+    sessionId: "test-session",
+    context: {
+      workspaceRoot: ws,
+      analyzer,
+      storage: new FakeStorage(),
+      log: options.log ?? (() => {}),
+    },
   });
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: "test-client", version: "0.0.0" });
@@ -177,7 +182,7 @@ describe("MCP server", () => {
     const { client, close } = await connect({ mode: "mentor", extraTools: [badOutput] });
     const result = await client.callTool({ name: "bad_output", arguments: {} });
     expect(result.isError).toBe(true);
-    expect(textOf(result)).toMatch(/^invalid_analysis_output: /);
+    expect(textOf(result)).toMatch(/^internal_error: /);
     await close();
   });
 

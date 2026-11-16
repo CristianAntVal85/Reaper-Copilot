@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { PythonAnalyzer } from "@reaper-copilot/adapter-analysis-py";
 import type { StoragePort } from "@reaper-copilot/core";
@@ -20,6 +21,7 @@ const log = (message: string): void => console.error(`[reaper-copilot] ${message
 const registry = createToolRegistry(ALL_TOOLS, config.mode);
 const server = createServer({
   registry,
+  sessionId: randomUUID(),
   context: { workspaceRoot: config.workspaceRoot, analyzer, storage, log },
 });
 

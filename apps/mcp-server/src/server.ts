@@ -1,63 +1,44 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { CopilotError } from "@reaper-copilot/core";
-import type { AnyToolDefinition, ToolContext, ToolRegistry } from "@reaper-copilot/tools";
+import {
+  createToolSession,
+  invokeTool,
+  type AnyToolDefinition,
+  type ToolContext,
+  type ToolRegistry,
+  type ToolSession,
+} from "@reaper-copilot/tools";
 
 export interface CreateServerOptions {
   readonly registry: ToolRegistry;
+  /** `context.log` is the diagnostics sink (stderr in `main.ts`; stdout is the protocol). */
   readonly context: ToolContext;
-  /** Diagnostics sink. stdout is the protocol, so the default writes to stderr. */
-  readonly log?: (message: string) => void;
+  /** Identifies this server run in the traces; one per start (`crypto.randomUUID()`). */
+  readonly sessionId: string;
 }
-
-const logToStderr = (message: string): void => {
-  console.error(`[reaper-copilot] ${message}`);
-};
 
 function errorResult(message: string): CallToolResult {
   return { isError: true, content: [{ type: "text", text: message }] };
-}
-
-function describe(error: unknown): string {
-  return error instanceof Error ? (error.stack ?? error.message) : String(error);
 }
 
 async function runTool(
   tool: AnyToolDefinition,
   input: unknown,
   context: ToolContext,
-  log: (message: string) => void,
+  session: ToolSession,
 ): Promise<CallToolResult> {
-  try {
-    const output = await tool.handler(input as never, context);
-    const checked = tool.outputSchema.safeParse(output);
-    if (!checked.success) {
-      log(`tool ${tool.name} produced output that does not match its schema: ${checked.error.message}`);
-      return errorResult("invalid_analysis_output: the tool result did not match its contract");
-    }
-    return {
-      content: [{ type: "text", text: JSON.stringify(checked.data) }],
-      structuredContent: checked.data as Record<string, unknown>,
-    };
-  } catch (error) {
-    // Domain errors carry a client-safe message that already starts with its code.
-    // Their `cause` (stderr, system errors) may hold paths: log it, never send it.
-    if (error instanceof CopilotError) {
-      if (error.cause !== undefined) {
-        log(`tool ${tool.name} failed with ${error.code}; cause: ${describe(error.cause)}`);
-      }
-      return errorResult(error.message);
-    }
-    // Anything else may hold stacks or internal paths: keep it on stderr, not in the reply.
-    log(`tool ${tool.name} failed unexpectedly: ${describe(error)}`);
-    return errorResult("internal_error: the tool failed unexpectedly");
-  }
+  const result = await invokeTool(tool, input, context, session);
+  if (!result.ok) return errorResult(result.message);
+  return {
+    content: [{ type: "text", text: JSON.stringify(result.output) }],
+    structuredContent: result.output as Record<string, unknown>,
+  };
 }
 
 /** Builds an MCP server exposing the registry's tools. Transport-agnostic: connect it yourself. */
 export function createServer(options: CreateServerOptions): McpServer {
   const { registry, context } = options;
-  const log = options.log ?? logToStderr;
+  const session = createToolSession(options.sessionId);
   const server = new McpServer({ name: "reaper-copilot", version: "0.0.0" });
 
   for (const tool of registry.list()) {
@@ -70,7 +51,7 @@ export function createServer(options: CreateServerOptions): McpServer {
         outputSchema: tool.outputSchema as never,
         annotations: { readOnlyHint: tool.risk === "read" },
       },
-      (async (input: unknown) => runTool(tool, input, context, log)) as never,
+      (async (input: unknown) => runTool(tool, input, context, session)) as never,
     );
   }
   return server;
