@@ -4,7 +4,7 @@ import { z } from "zod";
 /** Version of the request envelope; the bridge refuses any other. */
 export const BRIDGE_PROTOCOL_VERSION = 1;
 
-export const BRIDGE_METHODS = ["ping", "get_project_state", "import_audio", "set_tempo", "slice", "stretch", "undo", "quit"] as const;
+export const BRIDGE_METHODS = ["ping", "get_project_state", "import_audio", "set_tempo", "slice", "stretch", "apply_fx_chain", "undo", "quit"] as const;
 export type BridgeMethod = (typeof BRIDGE_METHODS)[number];
 
 export const BRIDGE_ERROR_CODES = [

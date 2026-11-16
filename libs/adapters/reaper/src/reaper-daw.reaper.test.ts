@@ -140,4 +140,57 @@ describe("Reaper bridge (real)", () => {
     const restored = await daw.getProjectState();
     expect(restored.tracks.map((t) => t.id)).toEqual(before.tracks.map((t) => t.id));
   });
+
+  it("applies the three presets with displayed values, then undoes", async () => {
+    await mkdir(WORKSPACE, { recursive: true });
+    tmp ??= await mkdtemp(path.join(WORKSPACE, "test-reaper-"));
+    const file = path.join(tmp, "fx.wav");
+    await writeFile(file, wav(1));
+
+    const before = await daw.getProjectState();
+    const { track } = await daw.importAudio(asAssetPath(file));
+
+    const distortion = await daw.applyFxChain(track.id, [
+      { plugin: "JS: Waveshaping Distortion", params: [{ name: "Distortion (%)", value: 80 }] },
+      {
+        plugin: "ReaLimit (Cockos)",
+        params: [
+          { name: "Threshold", value: -6 },
+          { name: "Ceiling", value: -0.3 },
+        ],
+      },
+    ]);
+    const text = (fx: number, name: string): number =>
+      Number.parseFloat(distortion.fx[fx]?.params.find((p) => p.name === name)?.text ?? "NaN");
+    expect(Math.abs(text(0, "Distortion (%)") - 80)).toBeLessThan(0.01);
+    expect(Math.abs(text(1, "Threshold") + 6)).toBeLessThan(0.01);
+    expect(Math.abs(text(1, "Ceiling") + 0.3)).toBeLessThan(0.01);
+
+    await daw.applyFxChain(track.id, [{ plugin: "ReaLimit (Cockos)", params: [{ name: "Threshold", value: -9 }, { name: "Ceiling", value: -1 }] }]);
+    await daw.applyFxChain(track.id, [{ plugin: "ReaEQ (Cockos)", params: [{ name: "Freq-High Pass 5", value: 80 }] }]);
+
+    const tooHigh = await daw
+      .applyFxChain(track.id, [{ plugin: "ReaLimit (Cockos)", params: [{ name: "Threshold", value: 50 }] }])
+      .catch((e: unknown) => e);
+    expect(tooHigh).toMatchObject({ code: "out_of_range" });
+    const noPlugin = await daw
+      .applyFxChain(track.id, [{ plugin: "No Such Plugin (Nobody)", params: [] }])
+      .catch((e: unknown) => e);
+    expect(noPlugin).toMatchObject({ code: "daw_error" });
+    const noParam = await daw
+      .applyFxChain(track.id, [{ plugin: "ReaLimit (Cockos)", params: [{ name: "Nope", value: 1 }] }])
+      .catch((e: unknown) => e);
+    expect(noParam).toMatchObject({ code: "daw_error" });
+    const noTrack = await daw
+      .applyFxChain("{00000000-0000-0000-0000-000000000000}", [{ plugin: "ReaLimit (Cockos)", params: [] }])
+      .catch((e: unknown) => e);
+    expect(noTrack).toMatchObject({ code: "track_not_found" });
+
+    const withFx = await daw.getProjectState();
+    expect(withFx.tracks.at(-1)?.fx).toHaveLength(4);
+
+    let undone = (await daw.undo()).undone;
+    while (undone !== "Copilot: import_audio") undone = (await daw.undo()).undone;
+    expect(await daw.getProjectState()).toEqual(before);
+  });
 });

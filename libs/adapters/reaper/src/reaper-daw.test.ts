@@ -165,7 +165,7 @@ describe("ReaperDaw", () => {
   });
 
   it("fails clearly on commands that are not bridged yet", async () => {
-    expect(await code(daw().applyFxChain())).toBe("daw_error");
+    expect(await code(daw().render())).toBe("daw_error");
   });
 
   it("imports audio with the path translated to UNC and the source back to Linux", async () => {
@@ -185,6 +185,28 @@ describe("ReaperDaw", () => {
     expect(seen).toEqual({ path: secret });
     expect(out.track.name).toBe("a.wav");
     expect(out.item.source).toBe("/home/secret/a.wav");
+  });
+
+  it("applies an FX chain and validates the answer", async () => {
+    const seen: { method: string; params: unknown }[] = [];
+    const chain = [{ plugin: "ReaLimit (Cockos)", params: [{ name: "Threshold", value: -6 }] }];
+    handler = (method, params) => {
+      seen.push({ method, params });
+      return {
+        ok: true,
+        result: { trackId: TRACK, fx: [{ plugin: "ReaLimit (Cockos)", params: [{ name: "Threshold", text: "-6.00" }] }] },
+      };
+    };
+    await bridge.start();
+    const applied = await daw().applyFxChain(TRACK, chain);
+    expect(applied.fx[0]?.params[0]?.text).toBe("-6.00");
+    expect(seen).toEqual([{ method: "apply_fx_chain", params: { trackId: TRACK, chain } }]);
+    handler = () => ({ ok: true, result: { trackId: TRACK } });
+    expect(await code(daw().applyFxChain(TRACK, chain))).toBe("invalid_daw_output");
+    handler = () => ({ ok: false, error: { code: "out_of_range", message: "x" } });
+    expect(await code(daw().applyFxChain(TRACK, chain))).toBe("out_of_range");
+    handler = () => ({ ok: false, error: { code: "fx_not_found", message: "x" } });
+    expect(await code(daw().applyFxChain(TRACK, chain))).toBe("daw_error");
   });
 
   it("sets the tempo", async () => {

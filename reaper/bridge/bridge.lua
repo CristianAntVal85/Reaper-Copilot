@@ -367,6 +367,102 @@ function methods.stretch(params)
   end)
 end
 
+local function find_track(id)
+  if type(id) ~= "string" or id == "" then fail("invalid_params", "trackId must be a non-empty string") end
+  for t = 0, reaper.CountTracks(0) - 1 do
+    local track = reaper.GetTrack(0, t)
+    if track and reaper.GetTrackGUID(track) == id then return track end
+  end
+  fail("track_not_found", "no track with that id")
+end
+
+local function find_param(track, fx, name)
+  for p = 0, reaper.TrackFX_GetNumParams(track, fx) - 1 do
+    local _, pname = reaper.TrackFX_GetParamName(track, fx, p, "")
+    if pname == name then return p end
+  end
+  fail("param_not_found", "the plugin has no parameter " .. name)
+end
+
+local function display_number(text)
+  local n = type(text) == "string" and tonumber(text:match("-?%d+%.?%d*")) or nil
+  if not n then fail("internal", "cannot read a number from the displayed value") end
+  return n
+end
+
+-- Sets a parameter so that the plugin DISPLAYS `target`. Cockos VSTs take normalized values, so the
+-- displayed value is searched by bisection; JS plugins take real units directly.
+local function set_param_displayed(track, fx, param, target, is_js)
+  if is_js then
+    local _, min, max = reaper.TrackFX_GetParam(track, fx, param)
+    if target < min or target > max then fail("out_of_range", "the value is outside the plugin's range") end
+    reaper.TrackFX_SetParam(track, fx, param, target)
+    return
+  end
+  local function shown(n)
+    local ok, text = reaper.TrackFX_FormatParamValueNormalized(track, fx, param, n, "")
+    if not ok then fail("internal", "the plugin cannot format a parameter value") end
+    return display_number(text)
+  end
+  local at0, at1 = shown(0), shown(1)
+  local ascending = at1 >= at0
+  local lo_val, hi_val = math.min(at0, at1), math.max(at0, at1)
+  local tolerance = 0.01 + 1e-6 * (hi_val - lo_val)
+  if target < lo_val - tolerance or target > hi_val + tolerance then
+    fail("out_of_range", "the value is outside what the plugin shows")
+  end
+  local lo, hi = 0, 1
+  for _ = 1, 40 do
+    local mid = (lo + hi) / 2
+    if (shown(mid) < target) == ascending then lo = mid else hi = mid end
+  end
+  -- The display is quantized: of the two ends of the last interval, keep the one that shows the closer value.
+  local best = (math.abs(shown(lo) - target) <= math.abs(shown(hi) - target)) and lo or hi
+  reaper.TrackFX_SetParamNormalized(track, fx, param, best)
+end
+
+function methods.apply_fx_chain(params)
+  local track = find_track(params.trackId)
+  local chain = params.chain
+  if type(chain) ~= "table" or #chain == 0 then fail("invalid_params", "chain must be a non-empty array") end
+  for _, entry in ipairs(chain) do
+    if type(entry) ~= "table" or type(entry.plugin) ~= "string" or type(entry.params) ~= "table" then
+      fail("invalid_params", "each chain entry needs plugin and params")
+    end
+    for _, p in ipairs(entry.params) do
+      if type(p) ~= "table" or type(p.name) ~= "string" or type(p.value) ~= "number" then
+        fail("invalid_params", "each parameter needs a name and a numeric value")
+      end
+    end
+  end
+  return undoable("apply_fx_chain", function()
+    local added = {}
+    local ok, result = pcall(function()
+      local applied = array()
+      for _, entry in ipairs(chain) do
+        local fx = reaper.TrackFX_AddByName(track, entry.plugin, false, -1)
+        if fx < 0 then fail("fx_not_found", "Reaper cannot load " .. entry.plugin) end
+        added[#added + 1] = fx
+        local is_js = entry.plugin:sub(1, 3) == "JS:"
+        local out = array()
+        for _, p in ipairs(entry.params) do
+          local index = find_param(track, fx, p.name)
+          set_param_displayed(track, fx, index, p.value, is_js)
+          local _, text = reaper.TrackFX_GetFormattedParamValue(track, fx, index, "")
+          out[#out + 1] = { name = p.name, text = text }
+        end
+        applied[#applied + 1] = { plugin = entry.plugin, params = out }
+      end
+      return { trackId = params.trackId, fx = applied }
+    end)
+    if not ok then
+      for i = #added, 1, -1 do reaper.TrackFX_Delete(track, added[i]) end
+      error(result, 0)
+    end
+    return result
+  end)
+end
+
 -- Only undoes the copilot's own blocks: never the user's work.
 function methods.undo()
   local label = reaper.Undo_CanUndo2(0)

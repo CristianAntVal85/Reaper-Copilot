@@ -4,10 +4,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   CopilotError,
+  AppliedFxChainSchema,
   type AppliedFxChain,
   type AssetPath,
   type DawItem,
   type DawPort,
+  type FxChain,
   type ItemId,
   type JobId,
   type JobStatus,
@@ -15,6 +17,7 @@ import {
   SliceSpecSchema,
   type SliceSpec,
   type StretchSpec,
+  type TrackId,
   type TrackRef,
 } from "@reaper-copilot/core";
 import type { z } from "zod";
@@ -151,10 +154,11 @@ export class ReaperDaw implements DawPort {
     return this.toDawItem(raw);
   }
 
-  // Not bridged yet (T5-T6).
-  applyFxChain(): Promise<AppliedFxChain> {
-    return Promise.reject(notImplemented("applyFxChain"));
+  async applyFxChain(trackId: TrackId, chain: FxChain): Promise<AppliedFxChain> {
+    return this.call("apply_fx_chain", { trackId, chain }, AppliedFxChainSchema);
   }
+
+  // Not bridged yet (T6).
   render(): Promise<JobId> {
     return Promise.reject(notImplemented("render"));
   }
