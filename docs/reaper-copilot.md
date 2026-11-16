@@ -186,7 +186,7 @@ reaper-copilot/
 └─ docs/
 ```
 
-**Regla de dependencias:** `core` ← `tools` ← `agent` ← `apps`. Los adaptadores solo dependen de `core`. Las `apps` cablean puertos y adaptadores.
+**Regla de dependencias:** `core` ← `tools` ← `agent` ← `apps`. Los adaptadores solo dependen de `core`. `testing` solo depende de `core` y lo usan `tools`, `agent` y `apps` (solo en pruebas). Las `apps` cablean puertos y adaptadores.
 
 ### 6.4 Puertos
 
@@ -440,7 +440,7 @@ Lista de trabajo. Los comandos concretos se validan en la fase 4.
 ### 11.3 Aplicación
 
 - Usuario de sistema sin privilegios (por ejemplo `copilot`) dueño del workspace.
-- Dependencias: Node 24, Python 3.11+ con entorno virtual, ffmpeg, Reaper para Linux.
+- Dependencias: Node 24, Python 3.11+ con entorno virtual, Reaper para Linux. F1a lee MP3 con `soundfile` (libsndfile ≥ 1.1) y no necesita ffmpeg; ffmpeg solo se añadiría si una fase posterior lo requiere.
 - **Reaper sin pantalla:** arrancarlo sobre una pantalla virtual (Xvfb) con `bridge.lua` cargado al inicio *(a comprobar; es un spike)*. El render no necesita dispositivo de audio.
 - **Licencia de Reaper:** revisar las condiciones para una demo pública antes de desplegar.
 - Servicios `systemd` con `Restart=always` para: pantalla virtual + Reaper, API NestJS y túnel. Arranque automático al encender.
@@ -511,7 +511,7 @@ El spike de Reaper sin pantalla puede adelantarse a la fase 0 si el portátil es
 - **Backend Live:** NestJS. **Frontend:** Angular.
 - **LLM (solo Live):** `@anthropic-ai/sdk`. Su `toolRunner` está en beta; alternativa: un bucle propio detrás de `LlmPort`.
 - **Python 3.11+** con `venv` + `pip`: librosa, pyloudnorm, numpy, scipy, soundfile.
-- **Reaper** con puente en Lua y plugins de serie: nativo de Windows en desarrollo, para Linux en el servidor. **ffmpeg**. **SQLite**.
+- **Reaper** con puente en Lua y plugins de serie: nativo de Windows en desarrollo, para Linux en el servidor. **ffmpeg** (no en F1a; ver §11.3). **SQLite**.
 
 ### 14.2 Pruebas
 

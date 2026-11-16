@@ -7,7 +7,13 @@ name = "analysis"
 version = "0.0.0"
 description = "Audio analysis CLI for Reaper Copilot"
 requires-python = ">=3.11"
-dependencies = ["librosa", "numpy", "pyloudnorm", "scipy", "soundfile"]
+dependencies = [
+  "librosa>=1.0.1,<2",
+  "numpy>=2.5.5,<3",
+  "pyloudnorm>=0.2.0,<1",
+  "scipy>=1.18.1,<2",
+  "soundfile>=0.14.0,<1",
+]
 
 [project.optional-dependencies]
 dev = ["pytest"]

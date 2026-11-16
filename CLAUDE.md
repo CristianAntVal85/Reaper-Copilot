@@ -39,7 +39,7 @@ En caso de duda entre dos vías, elige la más ligera y sube si el cambio crece.
 
 `apps/` (mcp-server, api, web) · `libs/` (core, tools, agent, adapters, testing) · `python/analysis/` · `reaper/` (bridge, presets) · `evals/` · `deploy/` · `specs/` · `docs/`.
 
-Dependencias: `core` ← `tools` ← `agent` ← `apps`. Los adaptadores solo dependen de `core`.
+Dependencias: `core` ← `tools` ← `agent` ← `apps`. Los adaptadores solo dependen de `core`. `testing` solo depende de `core` y lo usan `tools`, `agent` y `apps` (solo en pruebas).
 
 ## Entorno
 

@@ -58,6 +58,20 @@ def test_non_audio_file_exits_3(tmp_path: Path):
     assert result.stderr.startswith("unsupported_format:")
 
 
+def test_non_audio_error_message_has_no_path(tmp_path: Path):
+    path = tmp_path / "text.wav"
+    path.write_text("this is not audio")
+    result = run("analyze", str(path))
+    first_line = result.stderr.splitlines()[0]
+    assert first_line == "unsupported_format: cannot decode as audio"
+    assert str(tmp_path) not in first_line
+
+
+def test_missing_file_error_message_has_no_path(tmp_path: Path):
+    result = run("analyze", str(tmp_path / "nope.wav"))
+    assert result.stderr.splitlines()[0] == "file_not_found: file does not exist"
+
+
 def test_audio_shorter_than_half_second_exits_3(write_wav):
     path = write_wav("short.wav", click_track(170, seconds=0.4))
     result = run("analyze", str(path))

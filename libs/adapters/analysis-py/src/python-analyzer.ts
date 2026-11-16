@@ -21,7 +21,37 @@ export interface PythonAnalyzerOptions {
 export const DEFAULT_TIMEOUT_MS = 120_000;
 export const DEFAULT_MAX_OUTPUT_BYTES = 1_000_000;
 const STDERR_CAP_BYTES = 8_192;
-const MESSAGE_CAP_CHARS = 500;
+const DETAIL_CAP_CHARS = 500;
+
+/** Variables the child may inherit. Everything else (API keys, tokens) stays out. */
+const ENV_ALLOWLIST = new Set([
+  "PATH",
+  "HOME",
+  "LANG",
+  "LC_ALL",
+  "TMPDIR",
+  "TEMP",
+  "TMP",
+  "SYSTEMROOT",
+  "NUMBA_CACHE_DIR",
+  "VIRTUAL_ENV",
+]);
+
+export function childEnv(source: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {};
+  for (const [name, value] of Object.entries(source)) {
+    if (value !== undefined && (ENV_ALLOWLIST.has(name) || name.startsWith("LC_"))) env[name] = value;
+  }
+  env["PYTHONIOENCODING"] = "utf-8";
+  return env;
+}
+
+// Client-facing text per exit code. Never built from stderr: that can hold paths and library text.
+const EXIT_MESSAGES = {
+  file_not_found: "the file does not exist or cannot be read",
+  unsupported_format: "the file is not decodable audio or is shorter than 0.5 s",
+  analysis_failed: "the analysis failed unexpectedly",
+} as const;
 
 export const DEFAULT_PYTHON_PATH = fileURLToPath(
   new URL("../../../../python/analysis/.venv/bin/python", import.meta.url),
@@ -89,9 +119,12 @@ export class PythonAnalyzer implements AnalyzerPort {
 
   #exitError(result: RunResult): CopilotError {
     const code = result.code === 2 ? "file_not_found" : result.code === 3 ? "unsupported_format" : "analysis_failed";
-    let detail = result.stderr.trim().replace(new RegExp(`^${code}:\\s*`), "");
-    if (detail === "") detail = `analyzer exited with ${result.code === null ? "a signal" : `code ${result.code}`}`;
-    return new CopilotError(code, detail.slice(0, MESSAGE_CAP_CHARS));
+    const exit = result.code === null ? "a signal" : `code ${result.code}`;
+    const detail = result.stderr.trim().slice(0, DETAIL_CAP_CHARS);
+    // The stderr goes in `cause`, which only reaches the server log, never the client.
+    return new CopilotError(code, EXIT_MESSAGES[code], {
+      cause: new Error(`analyzer exited with ${exit}: ${detail}`),
+    });
   }
 
   #run(args: string[]): Promise<RunResult> {
@@ -99,7 +132,7 @@ export class PythonAnalyzer implements AnalyzerPort {
       // No shell: the arguments reach Python verbatim, whatever the file name contains.
       const child = spawn(this.#pythonPath, args, {
         stdio: ["ignore", "pipe", "pipe"],
-        env: { ...process.env, PYTHONIOENCODING: "utf-8" },
+        env: childEnv(),
       });
       const stdout: Buffer[] = [];
       const stderr: Buffer[] = [];
@@ -150,9 +183,7 @@ export class PythonAnalyzer implements AnalyzerPort {
       child.on("error", (cause) => {
         finish(() =>
           reject(
-            new CopilotError("analysis_failed", `cannot start the analyzer: ${cause.message}`, {
-              cause,
-            }),
+            new CopilotError("analysis_failed", "cannot start the analyzer", { cause }),
           ),
         );
       });

@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { asAssetPath, CopilotError, type AudioFeatures } from "@reaper-copilot/core";
-import { PythonAnalyzer } from "./python-analyzer.ts";
+import { childEnv, PythonAnalyzer } from "./python-analyzer.ts";
 
 const VALID: AudioFeatures = {
   schemaVersion: 1,
@@ -102,11 +102,11 @@ describe("PythonAnalyzer", () => {
     expect(error.message).toContain("tempo.bpm");
   });
 
-  it("maps exit code 2 to file_not_found and keeps the detail once", async () => {
+  it("maps exit code 2 to file_not_found with a fixed message", async () => {
     const pythonPath = await fakePython("echo 'file_not_found: no such file: x.wav' >&2; exit 2");
     const error = await failure(new PythonAnalyzer({ pythonPath }).analyze(audio));
     expect(error.code).toBe("file_not_found");
-    expect(error.message).toBe("file_not_found: no such file: x.wav");
+    expect(error.message).toBe("file_not_found: the file does not exist or cannot be read");
   });
 
   it("maps exit code 3 to unsupported_format", async () => {
@@ -119,7 +119,43 @@ describe("PythonAnalyzer", () => {
     const pythonPath = await fakePython("echo 'Traceback: boom' >&2; exit 1");
     const error = await failure(new PythonAnalyzer({ pythonPath }).analyze(audio));
     expect(error.code).toBe("analysis_failed");
-    expect(error.message).toContain("boom");
+    expect(error.message).toBe("analysis_failed: the analysis failed unexpectedly");
+  });
+
+  it("does not forward stderr or paths to the message; keeps them in the cause", async () => {
+    const secret = "/home/someone/secret-dir/take.wav";
+    const pythonPath = await fakePython(
+      `echo 'unsupported_format: cannot decode as audio: ${secret}' >&2; exit 3`,
+    );
+    const error = await failure(new PythonAnalyzer({ pythonPath }).analyze(audio));
+    expect(error.code).toBe("unsupported_format");
+    expect(error.message).not.toContain(secret);
+    expect(error.message).not.toContain("secret-dir");
+    expect((error.cause as Error).message).toContain(secret);
+  });
+
+  it("does not leak the system error when the interpreter cannot start", async () => {
+    const missing = join(dir, "no-such-python");
+    const error = await failure(new PythonAnalyzer({ pythonPath: missing }).analyze(audio));
+    expect(error.message).toBe("analysis_failed: cannot start the analyzer");
+    expect(error.message).not.toContain(dir);
+    expect(error.cause).toBeInstanceOf(Error);
+  });
+
+  it("does not pass secrets from the environment to the child", async () => {
+    const envFile = join(dir, "env.txt");
+    const pythonPath = await fakePython(`env > '${envFile}'\necho '${JSON.stringify(VALID)}'`);
+    process.env["ANTHROPIC_API_KEY"] = "sk-test-secret";
+    try {
+      await new PythonAnalyzer({ pythonPath }).analyze(audio);
+    } finally {
+      delete process.env["ANTHROPIC_API_KEY"];
+    }
+    const seen = await readFile(envFile, "utf8");
+    expect(seen).not.toContain("ANTHROPIC_API_KEY");
+    expect(seen).not.toContain("sk-test-secret");
+    expect(seen).toContain("PYTHONIOENCODING=utf-8");
+    expect(seen).toContain("PATH=");
   });
 
   it("maps a missing interpreter to analysis_failed", async () => {
@@ -151,11 +187,27 @@ describe("PythonAnalyzer", () => {
     const pythonPath = await fakePython("yes warning | head -c 200000 >&2; exit 1");
     const error = await failure(new PythonAnalyzer({ pythonPath }).analyze(audio));
     expect(error.code).toBe("analysis_failed");
-    expect(error.message.length).toBeLessThan(600);
+    expect((error.cause as Error).message.length).toBeLessThan(700);
   });
 
   it("rejects nonsensical limits", () => {
     expect(() => new PythonAnalyzer({ timeoutMs: 0 })).toThrow(RangeError);
     expect(() => new PythonAnalyzer({ maxOutputBytes: 1.5 })).toThrow(RangeError);
+  });
+});
+
+describe("childEnv", () => {
+  it("keeps only the allowed variables and LC_*", () => {
+    const env = childEnv({
+      PATH: "/bin",
+      HOME: "/home/u",
+      LC_CTYPE: "C.UTF-8",
+      ANTHROPIC_API_KEY: "x",
+      GITHUB_TOKEN: "y",
+      NUMBA_CACHE_DIR: "/cache",
+    });
+    expect(Object.keys(env).sort()).toEqual(
+      ["HOME", "LC_CTYPE", "NUMBA_CACHE_DIR", "PATH", "PYTHONIOENCODING"].sort(),
+    );
   });
 });

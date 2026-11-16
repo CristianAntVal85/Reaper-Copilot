@@ -18,6 +18,10 @@ function errorResult(message: string): CallToolResult {
   return { isError: true, content: [{ type: "text", text: message }] };
 }
 
+function describe(error: unknown): string {
+  return error instanceof Error ? (error.stack ?? error.message) : String(error);
+}
+
 async function runTool(
   tool: AnyToolDefinition,
   input: unknown,
@@ -37,9 +41,15 @@ async function runTool(
     };
   } catch (error) {
     // Domain errors carry a client-safe message that already starts with its code.
-    if (error instanceof CopilotError) return errorResult(error.message);
+    // Their `cause` (stderr, system errors) may hold paths: log it, never send it.
+    if (error instanceof CopilotError) {
+      if (error.cause !== undefined) {
+        log(`tool ${tool.name} failed with ${error.code}; cause: ${describe(error.cause)}`);
+      }
+      return errorResult(error.message);
+    }
     // Anything else may hold stacks or internal paths: keep it on stderr, not in the reply.
-    log(`tool ${tool.name} failed unexpectedly: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}`);
+    log(`tool ${tool.name} failed unexpectedly: ${describe(error)}`);
     return errorResult("internal_error: the tool failed unexpectedly");
   }
 }

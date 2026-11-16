@@ -5,11 +5,11 @@ Memoria entre sesiones. **Máximo 30 líneas, una idea por línea.** Lo que ya n
 Última actualización: 2026-11-16
 
 ## Dónde estamos
-- Fase F1a-analisis implementada (8 de 8 tareas) en `fase/F1a-analisis`, sin push, pendiente de revisión, demostración y pull request. Plan en `specs/F1a-analisis/plan.md`.
+- F1a-analisis implementada (8 de 8 tareas) en `fase/F1a-analisis`, sin push; plan en `specs/F1a-analisis/plan.md`. La revisión dio CAMBIOS NECESARIOS por un hallazgo medio (rutas y stderr hacia el cliente); corregido, pendiente de re-revisión de seguridad.
+- Pendientes bajos: sin límite de tamaño ni memoria del audio; `invalid_analysis_output` genérico en `server.ts`; `MODE=agent` de `.mcp.json` y `mcp:call` en `mentor` al llegar la escritura (fase 2); cola de un solo análisis para Live.
 
 ## Siguiente paso
-- Ejecutar `/sdd-validate F1a-analisis` (`reviewer` y `reviewer-security`: rutas y procesos hijo).
-- Demostración, paso 3: tempo de los seis temas de `spikes/librosa-bpm-alto/ground-truth.csv` a ±1 BPM; sin comprobar todavía.
+- Re-revisión de seguridad de F1a-analisis (`reviewer-security`).
 - Demostración, paso 5 (usuario, a mano): aprobar el servidor en sesión nueva de terminal y de VS Code, y pedir un análisis.
 - Push y pull request a `main` con el CI en verde. Después, F1b (`compare_audio`, caché, trazas).
 

@@ -30,22 +30,22 @@ def sha256_of(path: Path) -> str:
 
 def load(path: Path) -> LoadedAudio:
     if not path.exists():
-        raise file_not_found(f"file does not exist: {path.name}")
+        raise file_not_found("file does not exist")
     if not path.is_file():
-        raise file_not_found(f"not a regular file: {path.name}")
+        raise file_not_found("not a regular file")
     try:
         sha256 = sha256_of(path)
     except OSError as error:
-        raise file_not_found(f"cannot read file: {error.strerror}") from error
+        raise file_not_found("cannot read file", error.strerror) from error
     try:
         samples, sample_rate = sf.read(path, dtype="float32", always_2d=True)
     except (sf.LibsndfileError, RuntimeError) as error:
-        raise unsupported_format(f"cannot decode as audio: {error}") from error
+        raise unsupported_format("cannot decode as audio", str(error)) from error
     frames, channels = samples.shape
     duration = frames / sample_rate
     if duration < MIN_DURATION_SEC:
         raise unsupported_format(
-            f"audio is shorter than {MIN_DURATION_SEC} s ({duration:.3f} s)"
+            f"audio is shorter than {MIN_DURATION_SEC} s", f"{duration:.3f} s"
         )
     return LoadedAudio(sha256, duration, int(sample_rate), int(channels), samples)
 

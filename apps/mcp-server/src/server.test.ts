@@ -138,6 +138,25 @@ describe("MCP server", () => {
     await close();
   });
 
+  it("does not send the cause of a domain error to the client; it logs it", async () => {
+    const logged: string[] = [];
+    const cause = new Error("stderr said /home/someone/secret-dir/take.wav");
+    const analyzer = new FakeAnalyzer({
+      error: new CopilotError("unsupported_format", "the file is not decodable audio", { cause }),
+    });
+    const { client, close } = await connect({
+      mode: "mentor",
+      analyzer,
+      log: (message) => logged.push(message),
+    });
+    const result = await client.callTool({ name: "analyze_audio", arguments: { path: "song.wav" } });
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toBe("unsupported_format: the file is not decodable audio");
+    expect(JSON.stringify(result)).not.toContain("secret-dir");
+    expect(logged.join("\n")).toContain("secret-dir");
+    await close();
+  });
+
   it("does not leak unexpected error details to the client; it logs them", async () => {
     const logged: string[] = [];
     const secret = new Error("secret /home/someone/internal path");

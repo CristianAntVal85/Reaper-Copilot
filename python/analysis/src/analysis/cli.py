@@ -17,7 +17,7 @@ SCHEMA_VERSION = 1
 class _Parser(argparse.ArgumentParser):
     def error(self, message: str):  # argparse exits with 2, which means "file not found" here
         self.print_usage(sys.stderr)
-        sys.stderr.write(f"analysis_failed: {message}\n")
+        sys.stderr.write(f"analysis_failed: invalid arguments\ndetail: {message}\n")
         raise SystemExit(1)
 
 
@@ -77,9 +77,11 @@ def main(argv: list[str] | None = None) -> int:
         except AnalysisError:
             raise
         except Exception as error:
-            raise analysis_failed(f"{type(error).__name__}: {error}") from error
+            raise analysis_failed("unexpected error", f"{type(error).__name__}: {error}") from error
     except AnalysisError as error:
         sys.stderr.write(f"{error.code}: {error}\n")
+        if error.detail:  # debugging aid for a person at the terminal; callers must not forward it
+            sys.stderr.write(f"detail: {error.detail}\n")
         return error.exit_code
     sys.stdout.write(json.dumps(result, allow_nan=False) + "\n")
     return 0
