@@ -5,6 +5,18 @@ export const COPILOT_ERROR_CODES = [
   "analysis_failed",
   "analysis_timeout",
   "invalid_analysis_output",
+  "daw_unavailable",
+  "daw_timeout",
+  "daw_busy",
+  "daw_error",
+  "invalid_daw_output",
+  "item_not_found",
+  "track_not_found",
+  "preset_not_found",
+  "job_not_found",
+  "out_of_range",
+  "nothing_to_undo",
+  "render_failed",
 ] as const;
 
 export type CopilotErrorCode = (typeof COPILOT_ERROR_CODES)[number];
