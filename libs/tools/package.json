@@ -19,5 +19,8 @@
   "dependencies": {
     "@reaper-copilot/core": "workspace:*",
     "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@reaper-copilot/testing": "workspace:*"
   }
 }

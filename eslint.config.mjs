@@ -18,10 +18,14 @@ export default tseslint.config(
           allow: [],
           depConstraints: [
             { sourceTag: "scope:core", onlyDependOnLibsWithTags: [] },
-            { sourceTag: "scope:tools", onlyDependOnLibsWithTags: ["scope:core"] },
+            { sourceTag: "scope:testing", onlyDependOnLibsWithTags: ["scope:core"] },
+            {
+              sourceTag: "scope:tools",
+              onlyDependOnLibsWithTags: ["scope:core", "scope:testing"],
+            },
             {
               sourceTag: "scope:agent",
-              onlyDependOnLibsWithTags: ["scope:tools", "scope:core"],
+              onlyDependOnLibsWithTags: ["scope:tools", "scope:core", "scope:testing"],
             },
             { sourceTag: "scope:adapter", onlyDependOnLibsWithTags: ["scope:core"] },
             {
@@ -31,6 +35,7 @@ export default tseslint.config(
                 "scope:tools",
                 "scope:agent",
                 "scope:adapter",
+                "scope:testing",
               ],
             },
           ],

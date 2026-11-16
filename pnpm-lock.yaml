@@ -212,6 +212,12 @@ importers:
         specifier: ^4.6.7
         version: 4.6.7
 
+  libs/testing:
+    dependencies:
+      '@reaper-copilot/core':
+        specifier: workspace:*
+        version: link:../core
+
   libs/tools:
     dependencies:
       '@reaper-copilot/core':
@@ -220,6 +226,10 @@ importers:
       zod:
         specifier: ^4.6.7
         version: 4.6.7
+    devDependencies:
+      '@reaper-copilot/testing':
+        specifier: workspace:*
+        version: link:../testing
 
 packages:
 
