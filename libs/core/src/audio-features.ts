@@ -1,6 +1,12 @@
 import { z } from "zod";
 
-export const AUDIO_FEATURES_SCHEMA_VERSION = 1;
+export const AUDIO_FEATURES_SCHEMA_VERSION = 2;
+
+/**
+ * Revision of the analysis method in `python/analysis`. Bump it by hand whenever the method
+ * changes without a contract change, so cached analyses from the old method are not reused.
+ */
+export const ANALYSIS_REVISION = "1";
 
 export const TONICS = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"] as const;
 
@@ -19,6 +25,13 @@ export const AudioFeaturesSchema = z.strictObject({
     bpm: finite.positive(),
     confidence,
     alternatives: z.array(finite.positive()),
+    target: z
+      .strictObject({
+        bpm: finite.positive(),
+        deviationBpm: finite,
+        matches: z.boolean(),
+      })
+      .nullable(),
   }),
   key: z.strictObject({
     tonic: z.enum(TONICS),

@@ -1,3 +1,4 @@
+import math
 from dataclasses import dataclass
 
 import librosa
@@ -9,7 +10,14 @@ FRAMES_PER_SEC = SAMPLE_RATE / HOP_LENGTH
 STEP_BPM = 0.05
 BEAT_MULTIPLES = (1, 2, 4, 8)
 DEFAULT_RANGE = (140.0, 230.0)
-TARGET_TOLERANCE = 0.04
+MATCH_TOLERANCE_BPM = 1.0
+
+
+@dataclass(frozen=True)
+class TempoTarget:
+    bpm: float
+    deviation_bpm: float
+    matches: bool
 
 
 @dataclass(frozen=True)
@@ -17,6 +25,7 @@ class Tempo:
     bpm: float
     confidence: float
     alternatives: list[float]
+    target: TempoTarget | None = None
 
 
 def _comb_scores(envelope: np.ndarray, bpms: np.ndarray) -> np.ndarray:
@@ -36,8 +45,10 @@ def estimate_tempo(mono_22050: np.ndarray, target_bpm: float | None = None) -> T
     if target_bpm is None:
         low, high = DEFAULT_RANGE
     else:
-        low = target_bpm * (1 - TARGET_TOLERANCE)
-        high = target_bpm * (1 + TARGET_TOLERANCE)
+        # The target only picks the octave: the search is one octave wide, centered on it,
+        # so the measurement is not pulled towards the target.
+        low = target_bpm / math.sqrt(2)
+        high = target_bpm * math.sqrt(2)
     envelope = librosa.onset.onset_strength(
         y=mono_22050, sr=SAMPLE_RATE, hop_length=HOP_LENGTH
     )
@@ -46,4 +57,8 @@ def estimate_tempo(mono_22050: np.ndarray, target_bpm: float | None = None) -> T
     best = int(np.argmax(scores))
     bpm = round(float(bpms[best]), 2)
     confidence = float(np.clip(np.nan_to_num(scores[best]), 0.0, 1.0))
-    return Tempo(bpm, round(confidence, 3), [round(bpm / 2, 2), round(bpm * 2, 2)])
+    target = None
+    if target_bpm is not None:
+        deviation = round(bpm - target_bpm, 2)
+        target = TempoTarget(target_bpm, deviation, abs(deviation) <= MATCH_TOLERANCE_BPM)
+    return Tempo(bpm, round(confidence, 3), [round(bpm / 2, 2), round(bpm * 2, 2)], target)

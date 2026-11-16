@@ -26,12 +26,47 @@ def test_click_track_tempo_within_half_bpm(write_wav, bpm, use_target):
     assert abs(tempo["bpm"] - bpm) <= 0.5
     assert tempo["alternatives"] == [round(tempo["bpm"] / 2, 2), round(tempo["bpm"] * 2, 2)]
     assert 0 <= tempo["confidence"] <= 1
+    assert (tempo["target"] is None) == (not use_target)
+
+
+def _tempo(write_wav, bpm, *extra):
+    path = write_wav(f"clicks{bpm}.wav", click_track(bpm))
+    result = run("analyze", str(path), *extra)
+    assert result.returncode == 0, result.stderr
+    return json.loads(result.stdout)["tempo"]
+
+
+def test_without_target_the_tempo_target_is_null(write_wav):
+    assert _tempo(write_wav, 160)["target"] is None
+
+
+def test_target_that_disagrees_does_not_drag_the_measurement(write_wav):
+    tempo = _tempo(write_wav, 160, "--target-bpm", "190")
+    assert abs(tempo["bpm"] - 160) <= 0.5
+    target = tempo["target"]
+    assert target["bpm"] == 190
+    assert target["matches"] is False
+    assert target["deviationBpm"] == pytest.approx(tempo["bpm"] - 190, abs=0.01)
+    assert abs(target["deviationBpm"] + 30) <= 0.5
+
+
+def test_target_that_agrees_matches(write_wav):
+    tempo = _tempo(write_wav, 160, "--target-bpm", "160")
+    assert abs(tempo["bpm"] - 160) <= 0.5
+    assert tempo["target"]["matches"] is True
+    assert abs(tempo["target"]["deviationBpm"]) <= 1
+
+
+def test_target_picks_the_octave(write_wav):
+    tempo = _tempo(write_wav, 160, "--target-bpm", "80")
+    assert abs(tempo["bpm"] - 80) <= 0.25
+    assert tempo["target"]["matches"] is True
 
 
 def test_output_has_file_data_in_contract_format(write_wav):
     path = write_wav("stereo.wav", np.stack([click_track(170)] * 2, axis=1))
     output = json.loads(run("analyze", str(path)).stdout)
-    assert output["schemaVersion"] == 1
+    assert output["schemaVersion"] == 2
     file = output["file"]
     assert len(file["sha256"]) == 64 and file["sha256"] == file["sha256"].lower()
     assert file["sampleRate"] == SR and file["channels"] == 2

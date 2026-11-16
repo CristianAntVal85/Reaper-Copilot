@@ -14,7 +14,8 @@ export const analyzeAudio = defineTool({
     "Analyze an audio file in the workspace and return compact JSON: tempo, key, loudness, " +
     "band energies and dynamics. Use it whenever you need measured facts about a track. " +
     "path is relative to the workspace (.wav, .flac, .mp3, .aiff, .ogg). " +
-    "Pass targetBpm (60-320) when the approximate tempo is known, to avoid half or double tempo errors.",
+    "Pass targetBpm (60-320) when the approximate tempo is known: it only picks the octave (the measured tempo or its half or double), it does not pull the measurement. " +
+    "tempo.target.matches tells whether the measured tempo is within 1 BPM of targetBpm; tempo.target is null without it.",
   risk: "read",
   inputSchema: AnalyzeAudioInputSchema,
   outputSchema: AudioFeaturesSchema,

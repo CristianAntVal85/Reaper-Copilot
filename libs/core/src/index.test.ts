@@ -3,6 +3,6 @@ import { SCHEMA_VERSION } from "./index.ts";
 
 describe("core", () => {
   it("exposes the schema version", () => {
-    expect(SCHEMA_VERSION).toBe(1);
+    expect(SCHEMA_VERSION).toBe(2);
   });
 });
