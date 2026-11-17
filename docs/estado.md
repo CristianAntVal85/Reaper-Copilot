@@ -5,16 +5,16 @@ Memoria entre sesiones. **Máximo 30 líneas, una idea por línea.** Lo que ya n
 Última actualización: 2026-11-17
 
 ## Dónde estamos
-- F2b implementada y validada en `fase/F2b-tareas` (`reviewer` y `reviewer-security`, 2 vueltas, APROBADO; correcciones en la sección 7 del plan); falta la demostración del usuario (sección 6 del plan) y la pull request. Visto en la demostración de F2a, sin resolver: el render sale a 44100 Hz con fuente de 48000; una pista importada en otra sesión quedó con `source: null` y `undo_last` no la alcanza (`nothing_to_undo`).
+- F2b cerrada (pull request #6). Siguiente: fase 3 (Replay) en `fase/F3-replay`. Visto en la demostración de F2a, sin resolver: el render sale a 44100 Hz con fuente de 48000; una pista importada en otra sesión quedó con `source: null` y `undo_last` no la alcanza (`nothing_to_undo`).
 - Pendientes bajos de F2a: `ToolContext.daw`/`presets` opcionales; pruebas reales anteriores a T6 sin `finally`; `loadPresets` lanza `Error` normal; outbox sin límite de tamaño y esquemas sin acotar textos; respuestas huérfanas en outbox sin limpiar al arrancar; `activeRender` por proceso (un servidor por IPC); nombres de pista/plugin sin tope hacia el LLM; posible bloque de deshacer vacío si `import_audio` falla a medias; rutas del home en `spikes/reaper-ops/*.mjs`; la prueba real de M2 deja ajustes `RENDER_*` de prueba y la selección cambiada en el proyecto abierto; el puente acepta UNC con una sola barra inicial y solo rechaza `..` literal (no `.. ` ni `...`); lista de plugins duplicada en TS y Lua sin prueba que las compare. Otros: sin límite de tamaño ni memoria del audio; cola de un solo análisis para Live.
 - Antes de Live (fase 4): acotar `args` de las trazas; `.copilot/` en 0700 y `copilot.db` en 0600; la entrada inválida por MCP la rechaza el SDK y no deja traza.
 - Caché y almacenamiento: no guardar si el sha256 de Python difiere de la clave; validar la clave en `SqliteStorage` (objetivo 0 chocaría con «sin objetivo»); `hashFile` da `file_not_found` también con EACCES o EISDIR; `mcp:traces` abre la base en escritura; suite de almacenamiento duplicada. De F2b: el tope de 50 verificaciones se comprueba fuera del `INSERT` (dos llamadas concurrentes lo pasan por una) y no cuenta filas corruptas; `reserveTask` gasta hueco aunque `createTask` falle; tipo `NewVerification` sin usar.
 
 ## Siguiente paso
-- Demostración de F2b (sección 6 del plan) por el usuario y pull request a `main`.
+- Decidir idioma de la interfaz del Replay, muestras de audio y hosting estático (abajo); después `/sdd-plan F3-replay`.
 
 ## Hecho
-- Fases 0, F0b, F1a, F1b y F2a cerradas; diseño en `docs/reaper-copilot.md` v2.10. Detalle en `docs/CHANGELOG.md`.
+- Fases 0, F0b, F1a, F1b, F2a y F2b cerradas; diseño en `docs/reaper-copilot.md` v2.10. Detalle en `docs/CHANGELOG.md`.
 
 ## Pendiente de decidir (usuario)
 - Idioma del README y de la interfaz del Replay.
