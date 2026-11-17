@@ -12,7 +12,7 @@ Memoria entre sesiones. **Máximo 30 líneas, una idea por línea.** Lo que ya n
 - Caché y almacenamiento: no guardar si el sha256 de Python difiere de la clave; validar la clave en `SqliteStorage` (objetivo 0 chocaría con «sin objetivo»); `hashFile` da `file_not_found` también con EACCES o EISDIR; `mcp:traces` abre la base en escritura; suite de almacenamiento duplicada. De F2b: el tope de 50 verificaciones se comprueba fuera del `INSERT` (dos llamadas concurrentes lo pasan por una) y no cuenta filas corruptas; `reserveTask` gasta hueco aunque `createTask` falle; tipo `NewVerification` sin usar.
 
 ## Siguiente paso
-- Demostración de F3 por el usuario: tres ejecuciones reales con su audio (una con dos intentos), `pnpm replay:export`, revisión en local; después borrar las dos ejecuciones de prueba sin commit, pull request, fusión y activar Pages (Settings → Pages → Source: GitHub Actions).
+- Demostración de F3 por el usuario (guía paso a paso en `specs/F3-replay/guia-demo.md`): tres ejecuciones reales con su audio (una con dos intentos), `pnpm replay:export`, revisión en local; después borrar las dos ejecuciones de prueba sin commit, pull request, fusión y activar Pages (Settings → Pages → Source: GitHub Actions).
 
 ## Hecho
 - Fases 0, F0b, F1a, F1b, F2a y F2b cerradas; diseño en `docs/reaper-copilot.md` v2.11. Detalle en `docs/CHANGELOG.md`.
