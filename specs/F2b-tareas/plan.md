@@ -166,3 +166,14 @@ Criterio de salida: el caso «loop a 170» de punta a punta desde Claude Code, v
 5. **Mentor:** en una sesión con `mentor` (`/mcp`: 7 herramientas), el autor renderiza a mano en Reaper un tramo dentro de `workspace/`. Claude crea la tarea y la verifica sin herramientas que modifiquen.
 6. `pnpm mcp:traces 20`: las llamadas desde `start_task` llevan su tarea y las anteriores `-`.
 7. Pull request a `main`: CI en verde.
+
+## 7. Correcciones de la validación
+
+Primera vuelta tras la validación. Todo el código en `fix(tasks): ...`.
+
+- **M1, M2 (documento maestro, 9.2):** `measured` es siempre un número; `sourceValue` y `renderValue` son `null` en `absolute` y el ejemplo de `duration` lo refleja.
+- **B1 Rutas:** `start_task` guarda `source` y `verify_task` devuelve `render.path` relativos al workspace con `/`, calculados con `relativeToWorkspace` sobre la ruta que devuelve `resolveAssetPath` (ya con `realpath`).
+- **B2 `attempt`:** `StoragePort.recordVerification(v: Omit<Verification, "attempt">): Promise<Verification>`. SQLite hace un `INSERT ... SELECT COALESCE(MAX(attempt), 0) + 1 ... RETURNING attempt` sobre las filas crudas y reescribe `attempt` en el JSON con `json_set`; `FakeStorage` y las dos suites de comportamiento siguen el mismo contrato. `verify_task` construye la salida con lo devuelto.
+- **B3 Topes:** `MAX_VERIFICATIONS_PER_TASK = 50` y `MAX_TASKS_PER_SESSION = 100` en `core`. Las verificaciones se cuentan con `listVerifications` antes de analizar. Las tareas, con `ToolSession.reserveTask()` (expuesto como `ctx.trace.reserveTask()`; `createToolSession(id, { maxTasks })` permite inyectar el tope en pruebas). Ambos dan `out_of_range` con mensaje fijo.
+- **B4:** `SqliteStorage.getTask` lanza `Error` si la fila existe y no pasa `TaskSchema` (acaba en `internal_error`); `null` solo si no existe.
+- **B5:** `verify_task` exige `taskId: z.uuid()`.
