@@ -3,6 +3,8 @@
 Entradas nuevas arriba. Una línea por cambio relevante: fecha, fase o vía, qué se hizo y, si cambió una decisión del documento maestro, cuál.
 
 ## 2026-11-17
+- Fase F2b-tareas implementada (7 de 7 tareas), pendiente de revisión, demostración y pull request: contratos de tarea y evaluación puros en `core` (`deriveCriteria`, `evaluateCriteria`), `StoragePort` con tareas y verificaciones (migración 2 de SQLite), tarea activa por sesión, `start_task` y `verify_task` (14 herramientas en `ALL_TOOLS`) y `task=` en `pnpm mcp:traces`.
+- Documento maestro v2.10: `start_task` pasa a riesgo lectura por decisión del usuario, así `mentor` tiene 7 herramientas y `agent` 14 (7); al menos un criterio contando los derivados, ids `duration` y `tempo` reservados y `target` acotado (9.2); `verify_task` recibe `{ taskId, path }` con cualquier ruta del workspace y devuelve `attempt`, `render` y resultados de forma fija con `null` (7, 9.2); el origen solo se analiza si hay `delta`; tarea activa por sesión y `taskId` en las trazas (6.4, 9.3); `task_not_found` (8.1).
 - Fase F2a cerrada: pull request #5 fusionada. Demostración hecha por el autor: `clicks150.wav` cortado, estirado a 170 y con `distortion_hard` da un render de 5,647 s con `matches: true`; tema real (D-Fence, 179,95 BPM, 4 compases) da 5,334807 s frente a 5,334815 y `matches: true`; `undo_last` deja el proyecto vacío y el original con el mismo sha256; una traza por llamada.
 - Vía de cambio pequeño en F2a: el servidor MCP solo pasa al SDK los esquemas de salida de tipo objeto; con la unión de `get_job_status` el SDK revalidaba con `undefined` y el cliente recibía un error `_zod` aunque la traza decía `ok`.
 
