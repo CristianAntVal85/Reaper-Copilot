@@ -176,7 +176,7 @@ Riesgos:
     - `StoragePort.listToolCalls({ limit?, taskId? })`, con `SqliteStorage` y `FakeStorage` y los dos conjuntos compartidos.
     - `FakeAnalyzer.replayAssets`, que devuelve activos de ejemplo válidos y registra la llamada.
   - Hecho cuando: hay pruebas de los esquemas (un ejemplo completo válido, `file` con `/` o `..` rechazado, una longitud de `waveform` distinta de 800 rechazada) y el filtro por `taskId` devuelve solo las trazas de esa tarea en las dos implementaciones.
-- [ ] **T2. Subcomando de Python `replay-assets` y adaptador.**
+- [x] **T2. Subcomando de Python `replay-assets` y adaptador.**
   - Cambios:
     - `python/analysis/src/analysis/replay.py` y su entrada en `cli.py`.
     - `PythonAnalyzer.replayAssets`, con el tiempo límite y la validación de `analyze`.

@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import {
   AudioFeaturesSchema,
+  ReplayAssetsSchema,
   CopilotError,
   type AnalyzeOptions,
   type AnalyzerPort,
@@ -17,6 +18,16 @@ export interface PythonAnalyzerOptions {
   timeoutMs?: number;
   /** Cap on the bytes accepted from stdout; the process is killed beyond it. */
   maxOutputBytes?: number;
+}
+
+/** The part of a zod schema used here; the adapter does not depend on zod directly. */
+interface Parser<T> {
+  safeParse(value: unknown):
+    | { success: true; data: T }
+    | {
+        success: false;
+        error: { issues: { path: PropertyKey[]; message: string }[] };
+      };
 }
 
 export const DEFAULT_TIMEOUT_MS = 120_000;
@@ -41,7 +52,8 @@ const ENV_ALLOWLIST = new Set([
 export function childEnv(source: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {};
   for (const [name, value] of Object.entries(source)) {
-    if (value !== undefined && (ENV_ALLOWLIST.has(name) || name.startsWith("LC_"))) env[name] = value;
+    if (value !== undefined && (ENV_ALLOWLIST.has(name) || name.startsWith("LC_")))
+      env[name] = value;
   }
   env["PYTHONIOENCODING"] = "utf-8";
   return env;
@@ -81,11 +93,18 @@ export class PythonAnalyzer implements AnalyzerPort {
     }
   }
 
-  // TODO(T2): run `replay-assets` and validate with ReplayAssetsSchema.
-  replayAssets(input: AssetPath, output: string): Promise<ReplayAssets> {
-    void input;
-    void output;
-    return Promise.reject(new CopilotError("analysis_failed", "replayAssets is not implemented yet"));
+  async replayAssets(input: AssetPath, output: string): Promise<ReplayAssets> {
+    const result = await this.#run([
+      "-m",
+      "analysis",
+      "replay-assets",
+      "--out",
+      output,
+      "--",
+      input,
+    ]);
+    if (result.code !== 0) throw this.#exitError(result);
+    return this.#parse(result.stdout, ReplayAssetsSchema);
   }
 
   async analyze(path: AssetPath, options: AnalyzeOptions = {}): Promise<AudioFeatures> {
@@ -102,31 +121,40 @@ export class PythonAnalyzer implements AnalyzerPort {
     const result = await this.#run(args);
     if (result.code !== 0) throw this.#exitError(result);
 
+    return this.#parse(result.stdout, AudioFeaturesSchema);
+  }
+
+  #parse<T>(stdout: string, schema: Parser<T>): T {
     let parsed: unknown;
     try {
-      parsed = JSON.parse(result.stdout);
+      parsed = JSON.parse(stdout);
     } catch (cause) {
       throw new CopilotError("invalid_analysis_output", "analyzer output is not valid JSON", {
         cause,
       });
     }
-    const checked = AudioFeaturesSchema.safeParse(parsed);
+    const checked = schema.safeParse(parsed);
     if (!checked.success) {
       const issues = checked.error.issues
         .slice(0, 5)
-        .map((issue) => `${issue.path.join(".") || "(root)"}: ${issue.message}`)
+        .map((issue) => `${issue.path.map(String).join(".") || "(root)"}: ${issue.message}`)
         .join("; ");
       throw new CopilotError(
         "invalid_analysis_output",
         `analyzer output does not match the contract (${issues})`,
-        { cause: checked.error },
+        { cause: new Error(issues) },
       );
     }
     return checked.data;
   }
 
   #exitError(result: RunResult): CopilotError {
-    const code = result.code === 2 ? "file_not_found" : result.code === 3 ? "unsupported_format" : "analysis_failed";
+    const code =
+      result.code === 2
+        ? "file_not_found"
+        : result.code === 3
+          ? "unsupported_format"
+          : "analysis_failed";
     const exit = result.code === null ? "a signal" : `code ${result.code}`;
     const detail = result.stderr.trim().slice(0, DETAIL_CAP_CHARS);
     // The stderr goes in `cause`, which only reaches the server log, never the client.
@@ -191,7 +219,9 @@ export class PythonAnalyzer implements AnalyzerPort {
       child.on("error", (cause) => {
         finish(() =>
           reject(
-            new CopilotError("analysis_failed", "cannot start the analyzer", { cause }),
+            new CopilotError("analysis_failed", "cannot start the analyzer", {
+              cause,
+            }),
           ),
         );
       });

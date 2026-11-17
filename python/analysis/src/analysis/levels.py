@@ -54,14 +54,25 @@ def integrated_lufs(audio: LoadedAudio) -> float:
     return max(FLOOR_DB, value)
 
 
+def welch_density(mono: np.ndarray, sample_rate: int) -> tuple[np.ndarray, np.ndarray, float]:
+    """Power density of a mono signal: frequencies, density and the bin width."""
+    nperseg = min(8192, len(mono))
+    freqs, density = signal.welch(mono, fs=sample_rate, nperseg=nperseg, scaling="density")
+    return freqs, density, float(freqs[1] - freqs[0])
+
+
+def band_db(freqs: np.ndarray, density: np.ndarray, bin_width: float, low: float, high: float) -> float:
+    """dB re a full-scale sine of the density integrated over [low, high).
+
+    Integrating the density keeps the window leakage from inflating the power.
+    """
+    selected = density[(freqs >= low) & (freqs < high)]
+    return _db(float(selected.sum() * bin_width) / _FULL_SCALE_POWER)
+
+
 def band_energies_db(audio: LoadedAudio) -> dict[str, float]:
     mono = audio.samples.astype(np.float64).mean(axis=1)
-    nperseg = min(8192, len(mono))
-    # Density integrated over the band keeps the window leakage from inflating the power.
-    freqs, density = signal.welch(mono, fs=audio.sample_rate, nperseg=nperseg, scaling="density")
-    bin_width = freqs[1] - freqs[0]
-    result = {}
-    for name, (low, high) in BANDS.items():
-        selected = density[(freqs >= low) & (freqs < high)]
-        result[name] = _db(float(selected.sum() * bin_width) / _FULL_SCALE_POWER)
-    return result
+    freqs, density, bin_width = welch_density(mono, audio.sample_rate)
+    return {
+        name: band_db(freqs, density, bin_width, low, high) for name, (low, high) in BANDS.items()
+    }

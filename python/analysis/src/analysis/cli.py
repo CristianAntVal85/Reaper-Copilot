@@ -8,6 +8,7 @@ from analysis import __version__
 from analysis.audio import load, to_mono
 from analysis.errors import AnalysisError, analysis_failed
 from analysis.key import estimate_key
+from analysis.replay import replay_assets
 from analysis.levels import band_energies_db, crest_factor_db, integrated_lufs, peak_db
 from analysis.tempo import SAMPLE_RATE, estimate_tempo
 
@@ -35,6 +36,9 @@ def _build_parser() -> argparse.ArgumentParser:
     analyze = commands.add_parser("analyze", help="analyze an audio file and print JSON")
     analyze.add_argument("path", type=Path)
     analyze.add_argument("--target-bpm", type=_positive_finite, default=None)
+    replay = commands.add_parser("replay-assets", help="write an mp3 and print waveform and spectrum JSON")
+    replay.add_argument("--out", type=Path, required=True)
+    replay.add_argument("path", type=Path)
     return parser
 
 
@@ -80,7 +84,10 @@ def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     try:
         try:
-            result = analyze(args.path, args.target_bpm)
+            if args.command == "replay-assets":
+                result = replay_assets(args.path, args.out)
+            else:
+                result = analyze(args.path, args.target_bpm)
         except AnalysisError:
             raise
         except Exception as error:
