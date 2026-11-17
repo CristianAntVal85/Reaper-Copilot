@@ -214,7 +214,7 @@ Riesgos:
 - [x] **T7. Despliegue en GitHub Pages.**
   - Cambios: `.github/workflows/pages.yml` y el build con `--base-href /Reaper-Copilot/`.
   - Hecho cuando: el build local con ese `base href` genera `index.html` con `<base href="/Reaper-Copilot/">` y los recursos relativos, y el workflow pasa `actionlint` si está disponible o una revisión de su sintaxis. El despliegue real se comprueba en la demostración.
-- [ ] **T8. Documentación.**
+- [x] **T8. Documentación.**
   - Cambios:
     - Documento maestro v2.11:
       - **4.2:** el indicador de Live queda para la fase 4.

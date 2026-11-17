@@ -1,6 +1,6 @@
 # Reaper Copilot
 
-Documento maestro del proyecto (v2.10, 17-nov-2026). Es la fuente de verdad: sustituye a los borradores anteriores.
+Documento maestro del proyecto (v2.11, 17-nov-2026). Es la fuente de verdad: sustituye a los borradores anteriores.
 
 Lo leen tres públicos:
 
@@ -83,7 +83,8 @@ El producto se entrega en **tres bloques** sobre un mismo núcleo:
 - Reproduce **ejecuciones grabadas**: la petición, los pasos (llamadas a herramientas), los criterios y su resultado, con reproductores de audio antes y después, forma de onda y espectro.
 - No es un vídeo: es una página interactiva alimentada por archivos JSON y de audio exportados desde las trazas reales (sección 9). Un vídeo corto en el README la complementa.
 - Sin backend, sin API, sin Reaper. Coste cero.
-- Muestra un indicador "demo en vivo disponible / no disponible" consultando el estado del servidor Live.
+- El indicador "demo en vivo disponible / no disponible" llega en la fase 4, con el servidor Live.
+- La interfaz va en inglés. El sitio es una aplicación Angular 22.2 sin librerías de gráficas ni de audio: la forma de onda y el espectro son SVG propio sobre datos precalculados.
 - **Audio público:** solo material propio o con licencia que permita publicarlo. No usar fragmentos de canciones comerciales en la demo.
 
 ### 4.3 Bloque Live (portfolio, restringido)
@@ -206,6 +207,7 @@ interface DawPort {
 
 interface AnalyzerPort {
   analyze(path: AssetPath, options?: { targetBpm?: number }): Promise<AudioFeatures>;
+  replayAssets(input: AssetPath, output: string): Promise<ReplayAssets>; // escribe un MP3 en `output` (no puede existir) y devuelve forma de onda y espectro
 }
 
 // Trabajos y assets se añadirán en las fases siguientes.
@@ -221,7 +223,7 @@ interface StoragePort {
   getCachedAnalysis(key: AnalysisCacheKey): Promise<AudioFeatures | null>;
   putCachedAnalysis(key: AnalysisCacheKey, features: AudioFeatures): Promise<void>;
   recordToolCall(trace: ToolCallTrace): Promise<void>;
-  listToolCalls(options?: { limit?: number }): Promise<ToolCallTrace[]>; // más recientes primero
+  listToolCalls(options?: { limit?: number; taskId?: string }): Promise<ToolCallTrace[]>; // más recientes primero; con taskId, solo las de esa tarea
   createTask(task: Task): Promise<void>;
   getTask(taskId: string): Promise<Task | null>;
   recordVerification(verification: Omit<Verification, "attempt">): Promise<Verification>; // el almacenamiento asigna attempt = MAX + 1, atómico
@@ -267,6 +269,17 @@ En modo `mentor` solo se exponen las de lectura: siete (`get_project_state`, `li
 ### 8.1 TypeScript con Python
 
 - CLI: `python -m analysis analyze [--target-bpm N] -- <ruta>`. No hay subcomando `compare`: la comparación se calcula en TypeScript (sección 6.4). El `--` evita que un nombre de archivo se lea como opción.
+- `python -m analysis replay-assets --out <mp3> -- <entrada>` (F3). Escribe un MP3 CBR de unos 128 kbps con `soundfile` (`bitrate_mode=CONSTANT`, `compression_level=0.65`), sin sobrescribir: lo crea con un nombre temporal y lo renombra. Imprime por stdout un JSON `ReplayAssets` (esquema `ReplayAssetsSchema` en `libs/core/src/replay.ts`) y usa los mismos códigos de error y de salida que `analyze`. No hace falta ffmpeg.
+
+```json
+{
+  "durationSec": 5.65,
+  "waveform": { "min": [/* 800 valores en [-1, 1] */], "max": [/* 800 */] },
+  "spectrum": { "freqHz": [/* 96, crecientes, 20-20000 */], "db": [/* 96, mínimo -120 */] }
+}
+```
+
+- La forma de onda son 800 cubos con el mínimo y el máximo de cada uno. El espectro son 96 bandas logarítmicas de 20 Hz a 20 kHz, en dB con la misma referencia que `bands`.
 - Salida JSON por stdout; errores por stderr con un código legible al principio (`file_not_found: …`) y código de salida distinto de cero: 2 `file_not_found` (inexistente o ilegible), 3 `unsupported_format` (formato no admitido, audio de menos de 0,5 s o fallo al decodificar), 1 `analysis_failed` (cualquier otro error, incluidos los de argumentos).
 
 ```json
@@ -421,8 +434,10 @@ Un criterio es un dato, no texto libre. El esquema vive en zod en `libs/core` y 
 - **Tarea activa por sesión.** Las tareas y sus verificaciones se guardan en SQLite (tablas `tasks` y `task_verifications`). `start_task`, si sale bien, fija la tarea activa de la sesión; desde entonces cada traza lleva su `taskId`, incluida la de `start_task`. `verify_task` lleva el `taskId` de su entrada. Antes del primer `start_task`, `taskId` es `null`, igual que en las filas anteriores a F2b. `sessionId` es un UUID por arranque del servidor y `step` cuenta desde 1 en cada sesión (con `pnpm mcp:call`, que arranca un servidor por llamada, siempre es 1). `pnpm mcp:traces` imprime `task=<8 primeros caracteres>` o `-`.
 - Las trazas no llevan rutas absolutas ni la causa de los errores. Un fallo al escribir la traza o la caché se registra por stderr y no rompe la herramienta.
 - **Caché de análisis.** Clave: sha256 de los bytes del archivo, `targetBpm` (o `null`) y `revision = "<schemaVersion>.<ANALYSIS_REVISION>"`. `ANALYSIS_REVISION` es una constante de `libs/core` que se sube a mano al cambiar el método de análisis de Python. Lo leído de la caché se valida con `AudioFeaturesSchema`; si no pasa, se analiza de nuevo.
-- Un comando `export-replay` genera, por cada ejecución elegida, una carpeta con `run.json` (petición, pasos, criterios, resultados, análisis) y los audios antes y después en formato comprimido.
-- El sitio Replay solo lee esos archivos. Así el Replay muestra ejecuciones reales, no maquetas.
+- **Exportador.** `pnpm replay:export <taskId> [--title "<texto>"]` escribe en `apps/web/public/runs/<taskId>/` los archivos `run.json`, `source.mp3` y `render-<attempt>.mp3`, y regenera `apps/web/public/runs/index.json` (la más reciente primero). Sin `--title`, el título es la petición recortada a 120 caracteres. Lee la base SQLite sin crearla; `REPLAY_OUT_DIR` cambia la carpeta de salida y es solo para desarrollo. Las rutas se validan con `resolveAssetPath` y el resultado no lleva rutas absolutas. Avisa si una ejecución pasa de 15 MB. Si la tarea no existe o no tiene verificaciones, falla con `task_not_found`.
+- **`run.json`** (`ReplayRunSchema`, `schemaVersion` 1): `taskId` (uuid), `title`, `request`, `createdAt`, `target`, `criteria`, `source` y `verifications[]` (al menos una; cada una con `attempt`, `verifiedAt`, `pass`, `results` y `render`) y `steps[]`. `source` y cada `render` son `{ file, features, assets }`: el nombre del MP3 (sin carpetas), su `AudioFeatures` y su `ReplayAssets`. Cada paso es una traza sin `taskId` ni `cacheHits`.
+- **Índice** (`ReplayIndexSchema`): `{ schemaVersion: 1, runs: [{ taskId, title, createdAt, pass, attempts }] }`, con `pass` del último intento.
+- El sitio Replay solo lee esos archivos y no calcula nada. Así muestra ejecuciones reales, no maquetas.
 
 ---
 
@@ -444,7 +459,7 @@ flowchart LR
         APIS --> PS["Python"]
         APIS --> DB["SQLite"]
     end
-    DEV -- "export-replay + build" --> HOST
+    DEV -- "replay:export + build" --> HOST
     VIS["Reclutador"] --> REP
     REP -- "estado y modo Live" --> TUN
     APIS --> ANT["API de Claude"]
@@ -453,12 +468,13 @@ flowchart LR
 | Entorno | Equipo | Qué corre | Para qué |
 |---|---|---|---|
 | **Desarrollo** | PC del autor: Ryzen AI 7, 32 GB RAM, Windows con WSL | Claude Code, VS Code, servidor MCP y Python en WSL; Reaper nativo en Windows | Desarrollar, usar el bloque MCP, grabar ejecuciones para el Replay |
-| **Hosting estático** | Servicio gratuito (GitHub Pages o Cloudflare Pages) *(a comprobar)* | Sitio Replay | Portfolio siempre disponible |
+| **Hosting estático** | GitHub Pages (`https://cristianantval85.github.io/Reaper-Copilot/`) | Sitio Replay | Portfolio siempre disponible |
 | **Servidor Live** | Portátil viejo: Intel i3, 8 GB RAM, 256 GB, Ubuntu | API NestJS, agente, Reaper sin pantalla, Python, SQLite, túnel | Demo en vivo |
 | **Externos** | Anthropic, GitHub | API de Claude (solo Live), repositorio | — |
 
 Notas:
 
+- El sitio se despliega con `.github/workflows/pages.yml`: en cada push a `main` que toque `apps/web`, `libs/core`, el lockfile o el propio workflow (o a mano con `workflow_dispatch`), compila con `pnpm --filter @reaper-copilot/web build:pages` (base `/Reaper-Copilot/`, routing con `#`) y publica `apps/web/dist/browser`. En el repositorio hay que activar Settings → Pages → Source: GitHub Actions.
 - El frontend del modo Live es la misma aplicación Angular del hosting estático; llama a la API del portátil a través del túnel (CORS limitado al dominio del sitio).
 - El portátil basta para **una ejecución a la vez**: el LLM corre en la nube y el equipo solo ejecuta Reaper, el análisis y la API.
 
@@ -485,7 +501,7 @@ Lista de trabajo. Los comandos concretos se validan en la fase 4.
 ### 11.3 Aplicación
 
 - Usuario de sistema sin privilegios (por ejemplo `copilot`) dueño del workspace.
-- Dependencias: Node 24, Python 3.11+ con entorno virtual, Reaper para Linux. F1a lee MP3 con `soundfile` (libsndfile ≥ 1.1) y no necesita ffmpeg; ffmpeg solo se añadiría si una fase posterior lo requiere.
+- Dependencias: Node 24, Python 3.11+ con entorno virtual, Reaper para Linux. F1a lee MP3 con `soundfile` (libsndfile ≥ 1.1) y no necesita ffmpeg; el Replay (F3) tampoco lo necesita: comprime a MP3 con `soundfile`. ffmpeg solo se añadiría si una fase posterior lo requiere.
 - **Reaper sin pantalla:** arrancarlo sobre una pantalla virtual (Xvfb) con `bridge.lua` cargado al inicio *(a comprobar; es un spike)*. El render no necesita dispositivo de audio.
 - **Licencia de Reaper:** revisar las condiciones para una demo pública antes de desplegar.
 - Servicios `systemd` con `Restart=always` para: pantalla virtual + Reaper, API NestJS y túnel. Arranque automático al encender.
@@ -537,7 +553,7 @@ Lista de trabajo. Los comandos concretos se validan en la fase 4.
 | **1b. Comparación y trazas** | `compare_audio`, caché por sha256, SQLite con trazas | Comparar dos archivos desde Claude Code; el segundo análisis del mismo archivo sale de la caché |
 | **2a. Reaper desde MCP** | `bridge.lua`, adaptador de Reaper con traducción de rutas, `DawPort`, `FakeDaw`, herramientas de Reaper (estado, importar, tempo, cortar, estirar, presets y FX, render asíncrono, estado del trabajo, deshacer), modo `mentor` en `.mcp.json` | Desde Claude Code: importar, cortar 4 compases, estirar a 170, aplicar un preset y renderizar; el render dura lo esperado (±20 ms) medido con `analyze_audio` |
 | **2b. Tareas y verificación** | `start_task`, `verify_task`, criterios (sección 9.2), `taskId` en las trazas | El caso "loop a 170" de punta a punta desde Claude Code, verificado con criterios |
-| **3. Replay** | `export-replay`, aplicación Angular con reproductor, forma de onda, espectro y pasos; despliegue estático | URL pública con al menos tres ejecuciones reales |
+| **3. Replay** | `pnpm replay:export`, aplicación Angular con reproductor, forma de onda, espectro y pasos; despliegue estático | URL pública con al menos tres ejecuciones reales |
 | **4. Live** | Spike de Reaper sin pantalla en el portátil; `LlmPort`, bucle del agente, API NestJS, cola, invitaciones, límites; preparación del servidor y túnel | Ejecución en vivo desde la web con código de invitación y tope de gasto activo |
 | **5. Ampliaciones** | Búsqueda en la documentación de Reaper (sección 5.4), recetas por género, comparación con referencia, MIDI, stems, LLM local, otros clientes | Para la búsqueda en documentación: preguntar desde Claude Code y recibir respuesta con cita; evaluación de recuperación medida. Resto por definir |
 
@@ -554,10 +570,10 @@ El spike de Reaper sin pantalla puede adelantarse a la fase 0 si el portátil es
 - **MCP:** `@modelcontextprotocol/sdk` 1.32 o posterior. **Validación:** zod 4.
 - **TypeScript sin compilar:** Node 24 ejecuta los `.ts` directamente. Los imports relativos llevan extensión `.ts` y solo se usa sintaxis borrable (`erasableSyntaxOnly`: sin `enum`, `namespace` ni propiedades de parámetro en constructores).
 - **`check:full`:** typecheck, lint y test de todo el repositorio, más `pnpm py:test` y `nx run-many -t test:contract`.
-- **Backend Live:** NestJS. **Frontend:** Angular.
+- **Backend Live:** NestJS. **Frontend:** Angular 22.2 (`apps/web`, zoneless, routing con `#`), con `rxjs`, `tslib` y `jsdom` para las pruebas; sin librerías de gráficas ni de audio.
 - **LLM (solo Live):** `@anthropic-ai/sdk`. Su `toolRunner` está en beta; alternativa: un bucle propio detrás de `LlmPort`.
 - **Python 3.11+** con `venv` + `pip`: librosa, pyloudnorm, numpy, scipy, soundfile.
-- **Reaper** con puente en Lua y plugins de serie: nativo de Windows en desarrollo, para Linux en el servidor. **ffmpeg** (no en F1a; ver §11.3). **SQLite** con `node:sqlite` de Node 24, sin dependencia añadida (experimental; queda detrás de `StoragePort`).
+- **Reaper** con puente en Lua y plugins de serie: nativo de Windows en desarrollo, para Linux en el servidor. **ffmpeg** (no hace falta para el Replay; ver §11.3). **SQLite** con `node:sqlite` de Node 24, sin dependencia añadida (experimental; queda detrás de `StoragePort`).
 
 ### 14.2 Pruebas
 
@@ -591,11 +607,11 @@ El spike de Reaper sin pantalla puede adelantarse a la fase 0 si el portátil es
 
 ### 15.2 Preguntas abiertas
 
-1. Servicio de hosting estático y de túnel definitivos.
+1. Túnel definitivo para Live. El hosting estático está decidido: GitHub Pages.
 2. Condiciones de licencia de Reaper para la demo pública.
 3. Empaquetado de Python junto al servidor MCP para terceros.
-4. Idioma del README y de la interfaz del Replay.
-5. Qué muestras preinstaladas usar en Live y Replay (propias o con licencia libre).
+4. Cerrada (2026-11-17): README e interfaz del Replay en inglés; los documentos internos, en español.
+5. Muestras preinstaladas para Live (propias o con licencia libre). Cerrada para el Replay (2026-11-17): audio propio del autor.
 6. Modelo de Claude para el modo Live y límites concretos por visitante.
 7. Nombres y parámetros finales de los presets de FX para hardstyle y hardcore. En F2a hay tres presets provisionales (`distortion_hard`, `limiter_loud`, `eq_lowcut`) para probar el mecanismo; sus rangos y valores no son definitivos.
 8. Licencia de la documentación de Reaper: si permite ofrecer la búsqueda en el modo Live público.

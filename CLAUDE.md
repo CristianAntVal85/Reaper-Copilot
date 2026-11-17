@@ -31,6 +31,8 @@ En caso de duda entre dos vías, elige la más ligera y sube si el cambio crece.
 - `pnpm mcp:traces [n]`: imprime las últimas `n` trazas de llamadas a herramientas (SQLite).
 - `pnpm reaper:bridge`: carga `reaper/bridge/bridge.lua` en el Reaper de Windows abierto (`-nonewinst`); si el puente ya corre, hace `quit` y lo recarga. Hay que ejecutarlo antes de usar las herramientas de Reaper.
 - `pnpm test:reaper`: integración con Reaper real. Solo en local, con Reaper abierto y el puente cargado.
+- `pnpm replay:export <taskId> [--title "..."]`: exporta una ejecución a `apps/web/public/runs/<taskId>/` (`run.json` y MP3) y regenera `index.json`. Revisa rutas y tamaños antes de hacer commit.
+- `pnpm --filter @reaper-copilot/web start`: abre la web del Replay en local. `pnpm --filter @reaper-copilot/web build:pages`: la compila para GitHub Pages (`apps/web/dist/browser`).
 
 ## Servidor MCP
 
