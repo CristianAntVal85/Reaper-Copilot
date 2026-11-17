@@ -208,7 +208,7 @@ Riesgos:
 - [x] **T5. Página de ejecución: cabecera, criterios y pasos.**
   - Cambios: la ruta `/runs/:taskId`, con la cabecera, la tabla de criterios por intento (con el intento elegible) y la línea temporal de pasos con `args` y `result` desplegables.
   - Hecho cuando: con un `run.json` de ejemplo de dos intentos (`fail` y `pass`), las pruebas muestran los dos intentos y los valores de `measured`, y un texto con `<script>` en `request` o en `args` sale como texto literal. Un `run.json` inválido muestra el mensaje de error.
-- [ ] **T6. Panel de audio: reproductores, forma de onda y espectro.**
+- [x] **T6. Panel de audio: reproductores, forma de onda y espectro.**
   - Cambios: componentes SVG propios para la forma de onda (con marca de reproducción y salto con clic) y para el espectro de antes y después en eje logarítmico, más los reproductores HTML de antes y después del intento elegido.
   - Hecho cuando: las pruebas comprueban que el SVG de la forma de onda tiene un trazado a partir de los 800 puntos, que un `timeupdate` simulado mueve la marca y que un clic fija `currentTime`. El espectro dibuja dos series con 96 puntos y los reproductores tienen etiqueta accesible.
 - [ ] **T7. Despliegue en GitHub Pages.**

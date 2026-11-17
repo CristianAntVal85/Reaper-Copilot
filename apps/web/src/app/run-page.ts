@@ -2,6 +2,7 @@ import { DatePipe } from "@angular/common";
 import { Component, computed, inject, input, signal } from "@angular/core";
 import { RouterLink } from "@angular/router";
 import type { ReplayRun } from "@reaper-copilot/core";
+import { AudioPanel } from "./audio-panel";
 import { basisLabel, formatRange, formatTarget, formatValue, METRIC_LABELS } from "./metric-labels";
 import { RunsService } from "./runs.service";
 
@@ -9,7 +10,7 @@ type RunState = { kind: "loading" } | { kind: "error" } | { kind: "ready"; run: 
 
 @Component({
   selector: "app-run-page",
-  imports: [RouterLink, DatePipe],
+  imports: [RouterLink, DatePipe, AudioPanel],
   template: `
     @switch (state().kind) {
       @case ("loading") {
@@ -41,6 +42,10 @@ type RunState = { kind: "loading" } | { kind: "error" } | { kind: "ready"; run: 
           <dd>{{ r.verifications.length }}</dd>
         </dl>
       </header>
+
+      @if (attempt(); as a) {
+        <app-audio-panel [run]="r" [attempt]="a" />
+      }
 
       <section aria-labelledby="criteria-heading">
         <h2 id="criteria-heading">Criteria</h2>

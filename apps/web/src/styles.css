@@ -60,3 +60,21 @@ table.criteria thead th { background: #efefeb; }
 .step-n, .step-tool { font-weight: 600; }
 .step-status { color: var(--pass); font-weight: 600; }
 .step-status.fail { color: var(--fail); }
+.audio-panel { margin-bottom: 1.5rem; }
+.audio-blocks { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.audio-block h3 { font-size: 1rem; margin: 0 0 0.5rem; }
+.audio-block audio { width: 100%; }
+.waveform { display: block; width: 100%; height: 5rem; background: #fff; border: 1px solid var(--line); cursor: pointer; }
+.waveform:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.waveform .wave { fill: var(--accent); }
+.waveform .playhead { stroke: var(--fail); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.spectrum { margin: 1rem 0 0; }
+.spectrum svg { display: block; width: 100%; height: auto; background: #fff; border: 1px solid var(--line); }
+.spectrum .grid { stroke: var(--line); stroke-width: 1; }
+.spectrum .tick { fill: var(--muted); font-size: 11px; }
+.series { stroke-width: 2; }
+.series.before { stroke: var(--muted); stroke-dasharray: 6 4; }
+.series.after { stroke: var(--accent); }
+.legend { display: flex; gap: 1.5rem; font-size: 0.9rem; color: var(--muted); margin-top: 0.25rem; }
+.legend-item svg { vertical-align: middle; background: none; border: 0; width: 28px; }
+@media (max-width: 40rem) { .audio-blocks { grid-template-columns: 1fr; } }
