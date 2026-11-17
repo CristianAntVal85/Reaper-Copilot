@@ -17,6 +17,7 @@ export const COPILOT_ERROR_CODES = [
   "out_of_range",
   "nothing_to_undo",
   "render_failed",
+  "task_not_found",
 ] as const;
 
 export type CopilotErrorCode = (typeof COPILOT_ERROR_CODES)[number];
