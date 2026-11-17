@@ -18,4 +18,5 @@ export * from "./time-stretch.ts";
 export * from "./resolve-asset-path.ts";
 export * from "./tool-definition.ts";
 export * from "./undo-last.ts";
+export * from "./verify-task.ts";
 export * from "./tools.ts";

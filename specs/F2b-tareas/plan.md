@@ -136,7 +136,7 @@ Riesgos:
   - Hecho cuando: con una herramienta de prueba que llama a `taskStarted`, las trazas posteriores llevan su `taskId` y las anteriores `null`. Si esa herramienta falla, no cambia la tarea activa. `forTask` atribuye la llamada sin cambiar la tarea activa.
 - [x] **T4. `start_task`.** Riesgo `read`. Valida `source` con `resolveAssetPath` antes de guardar nada, genera el `taskId` con `randomUUID()`, guarda la tarea con los criterios derivados incluidos (`derived: true`) y llama a `taskStarted`. Salida: `{ taskId, criteria }`, con todos los criterios que se van a evaluar. La descripción explica la regla del `delta`, los criterios derivados, que no se pueden cambiar después y que el siguiente paso es `verify_task` con la ruta del render.
   - Hecho cuando: con `FakeStorage`, un `source` fuera del workspace da `path_outside_workspace` y no guarda nada. La salida no tiene rutas absolutas. Una tarea con `target: { bpm: 170, bars: 4 }` y sin criterios propios guarda `duration` y `tempo`. Un fallo al guardar da `internal_error`.
-- [ ] **T5. `verify_task`.** Riesgo `read`. La entrada es estricta, `{ taskId, path }`. Hace lo siguiente:
+- [x] **T5. `verify_task`.** Riesgo `read`. La entrada es estricta, `{ taskId, path }`. Hace lo siguiente:
   1. Valida `path`.
   2. Lee la tarea (`task_not_found` si no existe) y llama a `forTask`.
   3. Analiza el render y, si hay algún `delta`, el origen, con `analyzeWithCache`.
