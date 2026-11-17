@@ -13,6 +13,7 @@ export * from "./registry.ts";
 export * from "./render-selection.ts";
 export * from "./set-tempo.ts";
 export * from "./slice-loop.ts";
+export * from "./start-task.ts";
 export * from "./time-stretch.ts";
 export * from "./resolve-asset-path.ts";
 export * from "./tool-definition.ts";
