@@ -3,6 +3,7 @@ import type { ReplayAssets } from "@reaper-copilot/core";
 
 const WIDTH = 800;
 const HEIGHT = 100;
+let nextId = 0;
 
 @Component({
   selector: "app-waveform",
@@ -10,6 +11,7 @@ const HEIGHT = 100;
     <svg
       class="waveform"
       role="slider"
+      aria-orientation="horizontal"
       tabindex="0"
       [attr.aria-label]="label()"
       aria-valuemin="0"
@@ -21,7 +23,13 @@ const HEIGHT = 100;
       (click)="onClick($event)"
       (keydown)="onKey($event)"
     >
+      <defs>
+        <clipPath [attr.id]="clipId">
+          <rect x="0" y="0" [attr.width]="playheadX()" [attr.height]="height" />
+        </clipPath>
+      </defs>
       <polygon class="wave" [attr.points]="points()" />
+      <polygon class="wave played" [attr.points]="points()" [attr.clip-path]="'url(#' + clipId + ')'" />
       <line class="playhead" [attr.x1]="playheadX()" [attr.x2]="playheadX()" y1="0" [attr.y2]="height" />
     </svg>
   `,
@@ -32,6 +40,7 @@ export class Waveform {
   readonly label = input("Waveform");
   readonly seek = output<number>();
 
+  protected readonly clipId = `wave-played-${nextId++}`;
   protected readonly width = WIDTH;
   protected readonly height = HEIGHT;
 

@@ -1,4 +1,4 @@
-import { Component, computed, input, signal } from "@angular/core";
+import { Component, computed, effect, ElementRef, input, signal, untracked, viewChild } from "@angular/core";
 import type { ReplayVerification } from "@reaper-copilot/core";
 import type { ReplayRun } from "@reaper-copilot/core";
 import { Spectrum } from "./spectrum";
@@ -15,6 +15,7 @@ import { Waveform } from "./waveform";
           <h3 id="audio-before-label">Before (source)</h3>
           <audio
             #before
+            (play)="after.pause()"
             controls
             preload="metadata"
             aria-labelledby="audio-before-label"
@@ -32,6 +33,7 @@ import { Waveform } from "./waveform";
           <h3 id="audio-after-label">After (attempt {{ attempt().attempt }})</h3>
           <audio
             #after
+            (play)="before.pause()"
             controls
             preload="metadata"
             aria-labelledby="audio-after-label"
@@ -53,6 +55,27 @@ import { Waveform } from "./waveform";
 export class AudioPanel {
   readonly run = input.required<ReplayRun>();
   readonly attempt = input.required<ReplayVerification>();
+
+  private readonly afterEl = viewChild<ElementRef<HTMLAudioElement>>("after");
+  private shownAttempt: number | null = null;
+
+  constructor() {
+    // A new attempt is a different render: stop "After" and start it from the beginning.
+    effect(() => {
+      const attempt = this.attempt().attempt;
+      untracked(() => {
+        const previous = this.shownAttempt;
+        this.shownAttempt = attempt;
+        if (previous === null || previous === attempt) return;
+        const audio = this.afterEl()?.nativeElement;
+        if (audio) {
+          audio.pause();
+          audio.currentTime = 0;
+        }
+        this.afterTime.set(0);
+      });
+    });
+  }
 
   protected readonly beforeTime = signal(0);
   protected readonly afterTime = signal(0);

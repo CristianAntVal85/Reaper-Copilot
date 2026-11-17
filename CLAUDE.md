@@ -40,6 +40,7 @@ En caso de duda entre dos vías, elige la más ligera y sube si el cambio crece.
 - Para `agent` (las que modifican Reaper), regístralo en ámbito local: `claude mcp add --scope local reaper-copilot -e MODE=agent -- node apps/mcp-server/src/main.ts`.
 - Las rutas de audio van relativas a `workspace/` (ignorado por git, hay que crearlo) o absolutas dentro de él. `COPILOT_WORKSPACE` lo cambia, pero con Reaper debe ser el de por defecto (el puente solo acepta rutas bajo `<repositorio>/workspace`; el servidor avisa por stderr si no coincide); `MODE` por defecto es `mentor`.
 - Trazas y caché de análisis en SQLite: `<repositorio>/.copilot/copilot.db` (ignorado por git); `COPILOT_DATA_DIR` cambia la carpeta. Variables de Reaper: `COPILOT_REAPER_IPC` (carpeta del IPC, por defecto `<repositorio>/.copilot/reaper-ipc`), `COPILOT_REAPER_PATH_STYLE` (`unc` o `identity`), `COPILOT_PRESETS` (por defecto `reaper/presets`) y `COPILOT_REAPER_EXE` (solo para `reaper:bridge`). Al cambiar el método de análisis de Python, sube `ANALYSIS_REVISION` (`libs/core`) o borra `.copilot/`: si no, la caché devuelve análisis antiguos.
+- En `apps/web/public/runs/` solo va audio propio: se publica con el sitio (constitución 16). Los `*.mp3` de esa carpeta no se ignoran en git; los demás `*.mp3` siguen ignorados.
 
 ## Estructura
 

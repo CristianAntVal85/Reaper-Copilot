@@ -175,4 +175,41 @@ describe("exportReplayRun", () => {
     expect(text).not.toContain(ws);
     expect(text).toContain("see render.wav");
   });
+
+  it("rejects a task id that is not a UUID before touching anything", async () => {
+    await expect(run("../x")).rejects.toMatchObject({ code: "task_not_found" });
+    await expect(readdir(out)).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("fails without writing when a host path survives the scrub", async () => {
+    await seed(TASK_ID, "source.wav", "2026-01-01T00:00:00.000Z");
+    await storage.recordToolCall({
+      sessionId: "s1",
+      step: 3,
+      tool: "x",
+      args: { file: "/home/someone/secret.wav" },
+      ok: true,
+      result: {},
+      errorCode: null,
+      durationMs: 1,
+      startedAt: "2026-01-01T00:00:03.000Z",
+      cacheHits: 0,
+      taskId: TASK_ID,
+    });
+    await expect(run()).rejects.toThrow(/host path/);
+    await expect(readdir(out)).resolves.toEqual([]);
+  });
+
+  it("restores the previous export when the index cannot be regenerated", async () => {
+    await seed(TASK_ID, "source.wav", "2026-01-01T00:00:00.000Z");
+    await run();
+    const before = await readFile(path.join(out, TASK_ID, "run.json"), "utf8");
+    const indexBefore = await readFile(path.join(out, "index.json"), "utf8");
+    await mkdir(path.join(out, OTHER_ID));
+    await writeFile(path.join(out, OTHER_ID, "run.json"), JSON.stringify({ schemaVersion: 1 }));
+    await expect(run()).rejects.toMatchObject({ code: "invalid_analysis_output" });
+    expect(await readFile(path.join(out, TASK_ID, "run.json"), "utf8")).toBe(before);
+    expect(await readFile(path.join(out, "index.json"), "utf8")).toBe(indexBefore);
+    expect((await readdir(out)).sort()).toEqual([TASK_ID, OTHER_ID, "index.json"].sort());
+  });
 });

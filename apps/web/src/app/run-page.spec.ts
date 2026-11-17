@@ -66,4 +66,32 @@ describe("RunPage", () => {
     expect(el.textContent).toContain("This run could not be loaded");
     expect(el.querySelector("a")?.getAttribute("href")).toBe("/");
   });
+
+  it("shows the title, the original request with its label and a UTC date", async () => {
+    const { el } = await render(sampleRun({ request: "Haz un loop a 170 BPM" }));
+    expect(el.querySelector("h1")?.textContent).toBe(sampleRun().title);
+    expect(el.querySelector(".request-label")?.textContent).toContain("Original request");
+    const req = el.querySelector(".request") as HTMLElement;
+    expect(req.textContent).toBe("Haz un loop a 170 BPM");
+    expect(req.hasAttribute("lang")).toBe(false);
+    expect(el.textContent).toContain("2026-11-02 10:15 UTC");
+  });
+
+  it("scrolls the table inside a labelled focusable region and explains the tags", async () => {
+    const { el } = await render(sampleRun());
+    const region = el.querySelector(".table-scroll") as HTMLElement;
+    expect(region.getAttribute("role")).toBe("region");
+    expect(region.getAttribute("tabindex")).toBe("0");
+    expect(region.getAttribute("aria-label")).toContain("Criteria");
+    expect(region.querySelector("table.criteria")).not.toBeNull();
+    const notes = el.querySelector(".legend-notes")?.textContent ?? "";
+    for (const word of ["derived", "change vs source", "unmeasured"]) expect(notes).toContain(word);
+  });
+
+  it("logs the cause when the run cannot be loaded", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    await render({ schemaVersion: 1, title: "bad" });
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
+  });
 });

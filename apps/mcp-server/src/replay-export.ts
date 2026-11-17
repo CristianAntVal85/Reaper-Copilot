@@ -1,4 +1,5 @@
 import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import path from "node:path";
 import {
   CopilotError,
@@ -15,6 +16,7 @@ import {
   type StoragePort,
   type ToolCallTrace,
 } from "@reaper-copilot/core";
+import { z } from "zod";
 import { analyzeWithCache, resolveAssetPath, type ToolContext } from "@reaper-copilot/tools";
 
 export interface ExportReplayRunOptions {
@@ -62,6 +64,27 @@ function scrubPaths<T>(value: T, root: string): T {
     return v;
   };
   return walk(value) as T;
+}
+
+const LEAK_PATTERNS: readonly RegExp[] = [/\/home\//, /\/mnt\//, /\\\\wsl/i, /(^|[^A-Za-z])[A-Za-z]:\\/];
+
+/** Throws if any string in the value still looks like a host path (home, mounts, WSL shares, drive letters). */
+function assertNoPathLeaks(value: unknown): void {
+  const home = homedir();
+  const leaks = (text: string): boolean =>
+    LEAK_PATTERNS.some((re) => re.test(text)) || (home.length > 1 && text.includes(home));
+  const walk = (v: unknown): void => {
+    if (typeof v === "string") {
+      if (leaks(v)) throw new CopilotError("path_outside_workspace", "the export still contains a host path");
+    } else if (Array.isArray(v)) v.forEach(walk);
+    else if (v !== null && typeof v === "object") {
+      for (const [k, item] of Object.entries(v)) {
+        walk(k);
+        walk(item);
+      }
+    }
+  };
+  walk(value);
 }
 
 async function writeAtomic(file: string, content: string): Promise<void> {
@@ -112,11 +135,15 @@ export async function regenerateReplayIndex(outDir: string): Promise<ReplayIndex
 /**
  * Exports one task as `<outDir>/<taskId>/` (`run.json`, `source.mp3`, `render-<attempt>.mp3`) and
  * regenerates `<outDir>/index.json`. Paths are validated before anything is written; the folder is
- * built beside the final one and swapped in, so a failure leaves any previous export untouched.
+ * built beside the final one and swapped in, and the previous one is only deleted after the index
+ * has been regenerated, so any failure restores the previous export and leaves the index as it was.
  */
 export async function exportReplayRun(options: ExportReplayRunOptions): Promise<ExportReplayRunResult> {
   const { storage, analyzer, workspaceRoot, outDir, taskId, log } = options;
 
+  if (!z.uuid().safeParse(taskId).success) {
+    throw new CopilotError("task_not_found", `task id is not a UUID: ${taskId}`);
+  }
   const task = await storage.getTask(taskId);
   if (task === null) throw new CopilotError("task_not_found", `task not found: ${taskId}`);
   const verifications = await storage.listVerifications(taskId);
@@ -177,8 +204,7 @@ export async function exportReplayRun(options: ExportReplayRunOptions): Promise<
     }
 
     const title = (options.title ?? task.request.trim().slice(0, REPLAY_TITLE_MAX)).trim();
-    const run: ReplayRun = ReplayRunSchema.parse(
-      scrubPaths(
+    const scrubbed = scrubPaths(
         {
           schemaVersion: REPLAY_SCHEMA_VERSION,
           taskId: task.taskId,
@@ -192,8 +218,9 @@ export async function exportReplayRun(options: ExportReplayRunOptions): Promise<
           steps,
         },
         root,
-      ),
-    );
+      );
+    assertNoPathLeaks(scrubbed);
+    const run: ReplayRun = ReplayRunSchema.parse(scrubbed);
     await writeFile(path.join(tmpDir, "run.json"), `${JSON.stringify(run, null, 2)}\n`);
 
     hadPrevious = await stat(finalDir).then(
@@ -203,11 +230,12 @@ export async function exportReplayRun(options: ExportReplayRunOptions): Promise<
     if (hadPrevious) await rename(finalDir, oldDir);
     await rename(tmpDir, finalDir);
     swapped = true;
-    await rm(oldDir, { recursive: true, force: true });
     await regenerateReplayIndex(outDir);
+    await rm(oldDir, { recursive: true, force: true });
   } catch (error) {
     await rm(tmpDir, { recursive: true, force: true });
-    if (!swapped && hadPrevious) await rename(oldDir, finalDir).catch(() => undefined);
+    if (swapped) await rm(finalDir, { recursive: true, force: true });
+    if (hadPrevious) await rename(oldDir, finalDir).catch(() => undefined);
     throw error;
   }
 

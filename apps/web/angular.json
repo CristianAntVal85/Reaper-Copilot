@@ -23,8 +23,9 @@
           "configurations": {
             "production": {
               "outputHashing": "all",
+              // The initial bundle is ~730 kB because it includes zod (validated in the browser through libs/core).
               "budgets": [
-                { "type": "initial", "maximumWarning": "500kB", "maximumError": "1MB" }
+                { "type": "initial", "maximumWarning": "800kB", "maximumError": "1MB" }
               ]
             },
             "development": {

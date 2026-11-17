@@ -60,4 +60,14 @@ describe("RunListPage", () => {
     expect(el.textContent).toContain("Runs could not be loaded");
     expect(el.querySelectorAll("a.run-row")).toHaveLength(0);
   });
+
+  it("explains the site, links the repository and shows UTC dates", async () => {
+    const { el } = await render(index);
+    expect(el.querySelector(".intro")?.textContent).toContain("AI copilot for the Reaper DAW");
+    expect(el.querySelector(".intro")?.textContent).toContain("Pass");
+    expect(el.querySelector(".intro a")?.getAttribute("href")).toBe(
+      "https://github.com/CristianAntVal85/Reaper-Copilot",
+    );
+    expect(el.textContent).toContain("2026-11-02 10:15 UTC");
+  });
 });

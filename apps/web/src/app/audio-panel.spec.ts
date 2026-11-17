@@ -1,6 +1,6 @@
 import { TestBed } from "@angular/core/testing";
 import { provideRouter } from "@angular/router";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RunPage } from "./run-page";
 import { sampleRun, SAMPLE_TASK_ID } from "./run-fixture";
 
@@ -17,7 +17,12 @@ async function render() {
 }
 
 describe("audio panel", () => {
-  afterEach(() => vi.unstubAllGlobals());
+  // jsdom does not implement media playback.
+  beforeEach(() => void vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => undefined));
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
 
   it("draws the waveform from the 800 min/max pairs", async () => {
     const { el } = await render();
@@ -88,5 +93,59 @@ describe("audio panel", () => {
     fixture.detectChanges();
     expect(after()).toBe(`runs/${SAMPLE_TASK_ID}/render-1.mp3`);
     expect(el.querySelectorAll("audio")[0]?.getAttribute("src")).toBe(`runs/${SAMPLE_TASK_ID}/source.mp3`);
+  });
+
+  it("pauses the other player when one starts", async () => {
+    const pause = vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => undefined);
+    const { el } = await render();
+    const [before, after] = [...el.querySelectorAll("audio")] as HTMLAudioElement[];
+    const calls = () => pause.mock.contexts.slice();
+    before!.dispatchEvent(new Event("play"));
+    expect(calls()).toEqual([after]);
+    after!.dispatchEvent(new Event("play"));
+    expect(calls()).toEqual([after, before]);
+  });
+
+  it("pauses After and rewinds it when another attempt is chosen", async () => {
+    const pause = vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => undefined);
+    const { fixture, el } = await render();
+    const after = el.querySelectorAll("audio")[1] as HTMLAudioElement;
+    const head = () => el.querySelectorAll("svg.waveform")[1]?.querySelector(".playhead") as Element;
+    after.currentTime = 2;
+    after.dispatchEvent(new Event("timeupdate"));
+    fixture.detectChanges();
+    expect(Number(head().getAttribute("x1"))).toBeGreaterThan(0);
+    pause.mockClear();
+    (el.querySelectorAll(".attempt-selector button")[0] as HTMLButtonElement).click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(pause.mock.contexts).toContain(after);
+    expect(after.currentTime).toBe(0);
+    expect(head().getAttribute("x1")).toBe("0");
+  });
+
+  it("marks the played part of the waveform and the slider orientation", async () => {
+    const { fixture, el } = await render();
+    const svg = el.querySelectorAll("svg.waveform")[1]!;
+    expect(svg.getAttribute("aria-orientation")).toBe("horizontal");
+    const audio = el.querySelectorAll("audio")[1] as HTMLAudioElement;
+    audio.currentTime = 2.8235;
+    audio.dispatchEvent(new Event("timeupdate"));
+    fixture.detectChanges();
+    const played = svg.querySelector("polygon.played")!;
+    const clipId = /url\(#(.+)\)/.exec(played.getAttribute("clip-path") ?? "")?.[1];
+    const rect = svg.querySelector(`clipPath[id="${clipId}"] rect`)!;
+    expect(Number(rect.getAttribute("width"))).toBeCloseTo(400, 0);
+  });
+
+  it("labels the spectrum axes in HTML and marks 20 Hz and 20 kHz", async () => {
+    const { el } = await render();
+    const text = el.querySelector("figure.spectrum")!.textContent ?? "";
+    expect(text).toContain("Frequency (Hz");
+    expect(text).toContain("Level (dB, relative to full scale)");
+    const ticks = [...el.querySelectorAll(".x-labels .axis-tick")].map((t) => t.textContent?.trim());
+    expect(ticks).toEqual(["20 Hz", "100", "1k", "10k", "20k"]);
+    expect(el.querySelector("svg[role=img] text")).toBeNull();
   });
 });

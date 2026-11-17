@@ -52,8 +52,7 @@ const ENV_ALLOWLIST = new Set([
 export function childEnv(source: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {};
   for (const [name, value] of Object.entries(source)) {
-    if (value !== undefined && (ENV_ALLOWLIST.has(name) || name.startsWith("LC_")))
-      env[name] = value;
+    if (value !== undefined && (ENV_ALLOWLIST.has(name) || name.startsWith("LC_"))) env[name] = value;
   }
   env["PYTHONIOENCODING"] = "utf-8";
   return env;
@@ -149,12 +148,7 @@ export class PythonAnalyzer implements AnalyzerPort {
   }
 
   #exitError(result: RunResult): CopilotError {
-    const code =
-      result.code === 2
-        ? "file_not_found"
-        : result.code === 3
-          ? "unsupported_format"
-          : "analysis_failed";
+    const code = result.code === 2 ? "file_not_found" : result.code === 3 ? "unsupported_format" : "analysis_failed";
     const exit = result.code === null ? "a signal" : `code ${result.code}`;
     const detail = result.stderr.trim().slice(0, DETAIL_CAP_CHARS);
     // The stderr goes in `cause`, which only reaches the server log, never the client.
@@ -219,9 +213,7 @@ export class PythonAnalyzer implements AnalyzerPort {
       child.on("error", (cause) => {
         finish(() =>
           reject(
-            new CopilotError("analysis_failed", "cannot start the analyzer", {
-              cause,
-            }),
+            new CopilotError("analysis_failed", "cannot start the analyzer", { cause }),
           ),
         );
       });

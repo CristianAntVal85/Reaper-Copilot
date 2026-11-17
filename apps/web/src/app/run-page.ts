@@ -6,6 +6,8 @@ import { AudioPanel } from "./audio-panel";
 import { basisLabel, formatRange, formatTarget, formatValue, METRIC_LABELS } from "./metric-labels";
 import { RunsService } from "./runs.service";
 
+const DATE_FORMAT = "yyyy-MM-dd HH:mm 'UTC'";
+
 type RunState = { kind: "loading" } | { kind: "error" } | { kind: "ready"; run: ReplayRun };
 
 @Component({
@@ -25,13 +27,17 @@ type RunState = { kind: "loading" } | { kind: "error" } | { kind: "ready"; run: 
       <p><a routerLink="/">Back to runs</a></p>
       <header class="run-header">
         <h1>{{ r.title }}</h1>
+        <div class="original-request">
+          <p class="request-label" id="request-label">
+            Original request <span class="run-meta">(as typed by the user)</span>
+          </p>
+          <p class="request" aria-labelledby="request-label" title="as typed by the user">{{ r.request }}</p>
+        </div>
         <dl class="run-facts">
-          <dt>Request</dt>
-          <dd class="request">{{ r.request }}</dd>
           <dt>Target</dt>
           <dd>{{ targetText() }}</dd>
           <dt>Date</dt>
-          <dd>{{ r.createdAt | date: "medium" }}</dd>
+          <dd>{{ r.createdAt | date: DATE_FORMAT : "UTC" }}</dd>
           <dt>Result</dt>
           <dd>
             <span class="badge result-badge" [class.pass]="lastPass()" [class.fail]="!lastPass()">{{
@@ -62,6 +68,7 @@ type RunState = { kind: "loading" } | { kind: "error" } | { kind: "ready"; run: 
           }
         </div>
         @if (attempt(); as a) {
+          <div class="table-scroll" role="region" tabindex="0" [attr.aria-label]="'Criteria table, attempt ' + a.attempt">
           <table class="criteria">
             <caption class="sr-only">
               Criteria for attempt {{ a.attempt }}
@@ -104,6 +111,15 @@ type RunState = { kind: "loading" } | { kind: "error" } | { kind: "ready"; run: 
               }
             </tbody>
           </table>
+          </div>
+          <ul class="legend-notes">
+            <li><strong>derived</strong>: a criterion added automatically from the target.</li>
+            <li><strong>change vs source</strong>: the render value minus the source value.</li>
+            <li>
+              <strong>unmeasured</strong>: the tempo could not be measured with enough confidence, so it does
+              not count as a failure.
+            </li>
+          </ul>
         }
       </section>
 
@@ -120,7 +136,7 @@ type RunState = { kind: "loading" } | { kind: "error" } | { kind: "ready"; run: 
                     s.ok ? "ok" : s.errorCode
                   }}</span>
                   <span class="run-meta">{{ s.durationMs }} ms</span>
-                  <span class="run-meta">{{ s.startedAt | date: "mediumTime" }}</span>
+                  <span class="run-meta">{{ s.startedAt | date: "HH:mm:ss 'UTC'" : "UTC" }}</span>
                 </summary>
                 <h3>Arguments</h3>
                 <pre>{{ json(s.args) }}</pre>
@@ -135,6 +151,8 @@ type RunState = { kind: "loading" } | { kind: "error" } | { kind: "ready"; run: 
   `,
 })
 export class RunPage {
+  protected readonly DATE_FORMAT = DATE_FORMAT;
+
   readonly taskId = input.required<string>();
 
   private readonly runs = inject(RunsService);
@@ -181,7 +199,8 @@ export class RunPage {
   private async load(): Promise<void> {
     try {
       this.state.set({ kind: "ready", run: await this.runs.loadRun(this.taskId()) });
-    } catch {
+    } catch (error) {
+      console.error("Failed to load run", error);
       this.state.set({ kind: "error" });
     }
   }
