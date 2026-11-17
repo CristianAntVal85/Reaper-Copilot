@@ -211,7 +211,7 @@ Riesgos:
 - [x] **T6. Panel de audio: reproductores, forma de onda y espectro.**
   - Cambios: componentes SVG propios para la forma de onda (con marca de reproducción y salto con clic) y para el espectro de antes y después en eje logarítmico, más los reproductores HTML de antes y después del intento elegido.
   - Hecho cuando: las pruebas comprueban que el SVG de la forma de onda tiene un trazado a partir de los 800 puntos, que un `timeupdate` simulado mueve la marca y que un clic fija `currentTime`. El espectro dibuja dos series con 96 puntos y los reproductores tienen etiqueta accesible.
-- [ ] **T7. Despliegue en GitHub Pages.**
+- [x] **T7. Despliegue en GitHub Pages.**
   - Cambios: `.github/workflows/pages.yml` y el build con `--base-href /Reaper-Copilot/`.
   - Hecho cuando: el build local con ese `base href` genera `index.html` con `<base href="/Reaper-Copilot/">` y los recursos relativos, y el workflow pasa `actionlint` si está disponible o una revisión de su sintaxis. El despliegue real se comprueba en la demostración.
 - [ ] **T8. Documentación.**

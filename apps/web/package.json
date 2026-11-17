@@ -6,6 +6,7 @@
   "scripts": {
     "start": "ng serve",
     "build": "ng build",
+    "build:pages": "ng build --base-href /Reaper-Copilot/",
     "typecheck": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.spec.json --noEmit",
     "test": "ng test --no-watch",
     "lint": "eslint ."
