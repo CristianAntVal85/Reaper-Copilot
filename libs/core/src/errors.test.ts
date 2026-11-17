@@ -9,7 +9,7 @@ describe("CopilotError", () => {
     expect(error.code).toBe("file_not_found");
     expect(error.message).toBe("file_not_found: no such file");
     expect(error.cause).toBe(cause);
-    expect(COPILOT_ERROR_CODES).toHaveLength(6);
+    expect(COPILOT_ERROR_CODES).toHaveLength(18);
   });
 });
 

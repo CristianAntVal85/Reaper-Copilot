@@ -3,8 +3,9 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { AudioFeaturesSchema, CopilotError } from "@reaper-copilot/core";
-import { FakeAnalyzer, FakeStorage, SAMPLE_AUDIO_FEATURES } from "@reaper-copilot/testing";
+import { ReaperDaw } from "@reaper-copilot/adapter-reaper";
+import { AudioFeaturesSchema, CopilotError, JobStatusSchema, type DawPort } from "@reaper-copilot/core";
+import { FakeAnalyzer, FakeDaw, FakeStorage, SAMPLE_AUDIO_FEATURES } from "@reaper-copilot/testing";
 import {
   ALL_TOOLS,
   createToolRegistry,
@@ -27,7 +28,7 @@ afterAll(async () => {
 });
 
 const setTempo = defineTool({
-  name: "set_tempo",
+  name: "test_write",
   description: "Test-only write tool.",
   risk: "write",
   inputSchema: z.strictObject({ bpm: z.number() }),
@@ -61,6 +62,7 @@ async function connect(options: {
   analyzer?: FakeAnalyzer;
   extraTools?: Parameters<typeof createToolRegistry>[0];
   log?: (message: string) => void;
+  daw?: DawPort;
 }) {
   const analyzer = options.analyzer ?? new FakeAnalyzer();
   const storage = new FakeStorage();
@@ -72,6 +74,8 @@ async function connect(options: {
       workspaceRoot: ws,
       analyzer,
       storage,
+      daw: options.daw ?? new FakeDaw(),
+      presets: [],
       log: options.log ?? (() => {}),
     },
   });
@@ -88,15 +92,54 @@ const textOf = (result: object): string => {
 };
 
 describe("MCP server", () => {
-  it("lists analyze_audio and compare_audio as read-only", async () => {
+  const READ_TOOLS = ["get_project_state", "list_presets", "get_job_status", "analyze_audio", "compare_audio"];
+  const WRITE_TOOLS = [
+    "import_audio",
+    "set_tempo",
+    "slice_loop",
+    "time_stretch",
+    "apply_fx_chain",
+    "render_selection",
+    "undo_last",
+  ];
+
+  it("lists only the 5 read tools in mentor mode, all read-only", async () => {
     const { client, close } = await connect({ mode: "mentor" });
     const { tools } = await client.listTools();
-    expect(tools.map((tool) => tool.name)).toEqual(["analyze_audio", "compare_audio"]);
+    expect(tools.map((tool) => tool.name).sort()).toEqual([...READ_TOOLS].sort());
     for (const tool of tools) {
       expect(tool.annotations?.readOnlyHint).toBe(true);
-      expect(tool.outputSchema).toBeDefined();
+      expect(tool.outputSchema !== undefined || tool.name === "get_job_status").toBe(true);
     }
     await close();
+  });
+
+  it("lists the 12 tools in agent mode, with readOnlyHint matching the risk", async () => {
+    const { client, close } = await connect({ mode: "agent" });
+    const { tools } = await client.listTools();
+    expect(tools.map((tool) => tool.name).sort()).toEqual([...READ_TOOLS, ...WRITE_TOOLS].sort());
+    for (const tool of tools) {
+      expect(tool.annotations?.readOnlyHint).toBe(READ_TOOLS.includes(tool.name));
+      // get_job_status returns a discriminated union: not an object schema, so MCP advertises none.
+      expect(tool.outputSchema !== undefined || tool.name === "get_job_status").toBe(true);
+    }
+    await close();
+  });
+
+  it("answers daw_unavailable in under a second when the bridge is not running", async () => {
+    const ipcDir = await mkdtemp(path.join(tmpdir(), "rca-ipc-"));
+    try {
+      const daw = new ReaperDaw({ ipcDir, pathStyle: "identity" });
+      const { client, close } = await connect({ mode: "mentor", daw });
+      const started = performance.now();
+      const result = await client.callTool({ name: "get_project_state", arguments: {} });
+      expect(performance.now() - started).toBeLessThan(1000);
+      expect(result.isError).toBe(true);
+      expect(textOf(result)).toMatch(/^daw_unavailable: /);
+      await close();
+    } finally {
+      await rm(ipcDir, { recursive: true, force: true });
+    }
   });
 
   it("leaves one trace per call, successful or not", async () => {
@@ -127,6 +170,37 @@ describe("MCP server", () => {
     expect(analyzer.calls).toEqual([
       { path: path.join(ws, "song.wav"), options: { targetBpm: 190 } },
     ]);
+    await close();
+  });
+
+  it("answers get_job_status over MCP in every state, despite its union output schema", async () => {
+    const daw = new FakeDaw();
+    const { client, close } = await connect({ mode: "agent", daw });
+    const imported = await client.callTool({ name: "import_audio", arguments: { path: "song.wav" } });
+    const itemId = (imported.structuredContent as { item: { id: string } }).item.id;
+
+    const status = async (jobId: string) => {
+      const result = await client.callTool({ name: "get_job_status", arguments: { jobId } });
+      expect(result.isError, textOf(result)).toBeFalsy();
+      const parsed = JobStatusSchema.parse(result.structuredContent);
+      expect(JSON.parse(textOf(result))).toEqual(parsed);
+      return parsed;
+    };
+    const render = async () => {
+      const result = await client.callTool({ name: "render_selection", arguments: { itemId } });
+      return (result.structuredContent as { jobId: string }).jobId;
+    };
+
+    const ok = await render();
+    expect((await status(ok)).status).toBe("rendering");
+    daw.completeJob(ok, 5.647);
+    const done = await status(ok);
+    expect(done).toMatchObject({ status: "done", output: { durationSec: 5.647 }, errorCode: null });
+    expect(done.output?.path).toMatch(/^renders\/.+\.wav$/);
+
+    const bad = await render();
+    daw.failJob(bad);
+    expect(await status(bad)).toEqual({ jobId: bad, status: "failed", output: null, errorCode: "render_failed" });
     await close();
   });
 
@@ -208,14 +282,14 @@ describe("MCP server", () => {
   it("exposes no write tool in mentor mode", async () => {
     const { client, close } = await connect({ mode: "mentor", extraTools: [setTempo] });
     const { tools } = await client.listTools();
-    expect(tools.map((tool) => tool.name)).not.toContain("set_tempo");
+    expect(tools.map((tool) => tool.name)).not.toContain("test_write");
     await close();
   });
 
   it("exposes write tools in agent mode, not marked read-only", async () => {
     const { client, close } = await connect({ mode: "agent", extraTools: [setTempo] });
     const { tools } = await client.listTools();
-    const tool = tools.find((candidate) => candidate.name === "set_tempo");
+    const tool = tools.find((candidate) => candidate.name === "test_write");
     expect(tool?.annotations?.readOnlyHint).toBe(false);
     await close();
   });

@@ -1,0 +1,24 @@
+{
+  "name": "@reaper-copilot/adapter-reaper",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:reaper": "vitest run --config vitest.reaper.config.ts",
+    "lint": "eslint ."
+  },
+  "nx": {
+    "tags": [
+      "scope:adapter"
+    ]
+  },
+  "dependencies": {
+    "@reaper-copilot/core": "workspace:*",
+    "zod": "^4.6.7"
+  }
+}

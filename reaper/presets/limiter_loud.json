@@ -1,0 +1,11 @@
+{
+  "id": "limiter_loud",
+  "description": "Brickwall limiter that raises loudness: lower threshold means louder and flatter dynamics.",
+  "fx": [
+    { "plugin": "ReaLimit (Cockos)", "params": { "Threshold": { "knob": "threshold" }, "Ceiling": { "knob": "ceiling" } } }
+  ],
+  "knobs": {
+    "threshold": { "description": "Limiter threshold", "unit": "dB", "min": -12, "max": 0, "default": -6 },
+    "ceiling": { "description": "Maximum output level", "unit": "dB", "min": -3, "max": 0, "default": -0.3 }
+  }
+}

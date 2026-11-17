@@ -1,4 +1,4 @@
-import type { AnalyzerPort, StoragePort } from "@reaper-copilot/core";
+import type { AnalyzerPort, DawPort, Preset, StoragePort } from "@reaper-copilot/core";
 import type { z } from "zod";
 
 export const TOOL_MODES = ["mentor", "agent"] as const;
@@ -12,6 +12,10 @@ export interface ToolContext {
   readonly workspaceRoot: string;
   readonly analyzer: AnalyzerPort;
   readonly storage: StoragePort;
+  /** Reaper, when the server has one configured (wired by the server). */
+  readonly daw?: DawPort;
+  /** Loaded FX presets (wired by the server). */
+  readonly presets?: readonly Preset[];
   /** Diagnostics for the operator (stderr in the server); never part of a tool response. */
   readonly log: (message: string) => void;
   /** Per-call counters; `invokeTool` provides it so the trace can report `cacheHits`. */

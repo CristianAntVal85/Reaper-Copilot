@@ -1,0 +1,12 @@
+{
+  "id": "distortion_hard",
+  "description": "Hard waveshaping distortion followed by a limiter. Lowers the crest factor and raises loudness.",
+  "fx": [
+    { "plugin": "JS: Waveshaping Distortion", "params": { "Distortion (%)": { "knob": "drive" } } },
+    { "plugin": "ReaLimit (Cockos)", "params": { "Threshold": { "knob": "threshold" }, "Ceiling": { "value": -0.3 } } }
+  ],
+  "knobs": {
+    "drive": { "description": "Distortion amount", "unit": "%", "min": 0, "max": 90, "default": 60 },
+    "threshold": { "description": "Limiter threshold", "unit": "dB", "min": -12, "max": 0, "default": -6 }
+  }
+}
