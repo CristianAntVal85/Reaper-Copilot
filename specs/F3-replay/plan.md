@@ -121,7 +121,7 @@ Fase 3 (sección 13 del documento maestro, fila «3. Replay»). Criterio de sali
     - la tabla de criterios por intento, con `measured`, `min`, `max` y `status`;
     - la línea temporal de pasos (herramienta, ok o código de error, duración), con `args` y `result` desplegables como JSON con formato;
     - el panel de audio: reproductores de antes (origen) y después (render del intento elegido), la forma de onda en SVG con una marca de reproducción que sigue a `timeupdate` y permite saltar con un clic, y el espectro de antes y después superpuestos en SVG con el eje logarítmico en Hz.
-- **Texto:** todo en inglés.
+- **Texto:** todo en inglés, salvo la petición original, que se muestra tal como la escribió el usuario (sección 7).
 - **Accesibilidad:** contraste suficiente, controles con teclado y etiquetas en los reproductores.
 - **Pruebas:** con Vitest y jsdom, con datos de ejemplo validados por el esquema.
 
@@ -259,3 +259,5 @@ Primera vuelta de validación; todo corregido en `fix(web): route input binding,
 | 12 | Presupuesto del bundle | aviso a 800 kB (el bundle inicial son unos 730 kB por zod de `core`), comentado en `angular.json` |
 
 Añadido sin pedirlo: `**/.angular/` en los ignores de ESLint (la caché de Angular rompía `lint` de `web`).
+
+Segunda vuelta (`reviewer`, `reviewer-security` y `reviewer-ui`: APROBADO). Corregido además en `47c6e41`: la página de ejecución se recarga cuando solo cambia el `taskId` (el router reutiliza el componente; hallazgo medio de `reviewer-ui`, con prueba de navegación entre ejecuciones), la cabecera dice «Final result» y el exportador rechaza también `C:/`, `/Users/` y `/root/`. Los bajos restantes están en `docs/estado.md`.
