@@ -154,6 +154,21 @@ export function describeStorageBehaviour(name: string, create: () => Promise<Sto
       expect(await storage.listToolCalls()).toEqual([attributed]);
     });
 
+    it("filters calls by taskId, newest first, and combines it with limit", async () => {
+      const storage = await create();
+      const other = "22222222-2222-4222-8222-222222222222";
+      await storage.recordToolCall(trace(1, { taskId: TASK_ID }));
+      await storage.recordToolCall(trace(2, { taskId: other }));
+      await storage.recordToolCall(trace(3));
+      await storage.recordToolCall(trace(4, { taskId: TASK_ID }));
+      expect((await storage.listToolCalls({ taskId: TASK_ID })).map((t) => t.step)).toEqual([4, 1]);
+      expect((await storage.listToolCalls({ taskId: other })).map((t) => t.step)).toEqual([2]);
+      expect(
+        (await storage.listToolCalls({ taskId: TASK_ID, limit: 1 })).map((t) => t.step),
+      ).toEqual([4]);
+      expect(await storage.listToolCalls({ taskId: "33333333-3333-4333-8333-333333333333" })).toEqual([]);
+    });
+
     it("creates and reads a task; an unknown one is null", async () => {
       const storage = await create();
       expect(await storage.getTask(TASK_ID)).toBeNull();

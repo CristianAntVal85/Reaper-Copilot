@@ -169,7 +169,7 @@ Riesgos:
 
 ## 5. Tareas
 
-- [ ] **T1. Contratos del Replay y trazas por tarea.**
+- [x] **T1. Contratos del Replay y trazas por tarea.**
   - Cambios:
     - `libs/core/src/replay.ts` con `ReplayAssetsSchema`, `ReplayRunSchema` y `ReplayIndexSchema`, con sus reglas: `file` con patrón, `title` de 1 a 120 caracteres, 800 valores por canal en `waveform`, 96 en `spectrum` y `freqHz` creciente.
     - `AnalyzerPort.replayAssets`.

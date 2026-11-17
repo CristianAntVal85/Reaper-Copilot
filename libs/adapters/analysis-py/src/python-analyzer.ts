@@ -7,6 +7,7 @@ import {
   type AnalyzerPort,
   type AssetPath,
   type AudioFeatures,
+  type ReplayAssets,
 } from "@reaper-copilot/core";
 
 export interface PythonAnalyzerOptions {
@@ -78,6 +79,13 @@ export class PythonAnalyzer implements AnalyzerPort {
     if (!Number.isInteger(this.#maxOutputBytes) || this.#maxOutputBytes <= 0) {
       throw new RangeError("maxOutputBytes must be a positive integer");
     }
+  }
+
+  // TODO(T2): run `replay-assets` and validate with ReplayAssetsSchema.
+  replayAssets(input: AssetPath, output: string): Promise<ReplayAssets> {
+    void input;
+    void output;
+    return Promise.reject(new CopilotError("analysis_failed", "replayAssets is not implemented yet"));
   }
 
   async analyze(path: AssetPath, options: AnalyzeOptions = {}): Promise<AudioFeatures> {

@@ -19,7 +19,7 @@ export type StorageCall =
       readonly features: AudioFeatures;
     }
   | { readonly method: "recordToolCall"; readonly trace: ToolCallTrace }
-  | { readonly method: "listToolCalls"; readonly options: { limit?: number } | undefined }
+  | { readonly method: "listToolCalls"; readonly options: { limit?: number; taskId?: string } | undefined }
   | { readonly method: "createTask"; readonly task: Task }
   | { readonly method: "getTask"; readonly taskId: string }
   | { readonly method: "recordVerification"; readonly verification: Omit<Verification, "attempt"> }
@@ -88,14 +88,16 @@ export class FakeStorage implements StoragePort {
     this.#traces.push(ToolCallTraceSchema.parse(copy(trace)));
   }
 
-  async listToolCalls(options?: { limit?: number }): Promise<ToolCallTrace[]> {
+  async listToolCalls(options?: { limit?: number; taskId?: string }): Promise<ToolCallTrace[]> {
     this.calls.push({ method: "listToolCalls", options });
     if (this.errors.list) throw this.errors.list;
     const limit = options?.limit;
     if (limit !== undefined && (!Number.isInteger(limit) || limit < 0)) {
       throw new RangeError("limit must be a non-negative integer");
     }
-    const newestFirst = [...this.#traces].reverse();
+    const newestFirst = this.#traces
+      .filter((t) => options?.taskId === undefined || t.taskId === options.taskId)
+      .reverse();
     return copy(limit === undefined ? newestFirst : newestFirst.slice(0, limit));
   }
 

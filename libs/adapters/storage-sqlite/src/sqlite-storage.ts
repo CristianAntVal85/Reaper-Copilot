@@ -88,6 +88,7 @@ export class SqliteStorage implements StoragePort {
   readonly #putCache: StatementSync;
   readonly #insertCall: StatementSync;
   readonly #listCalls: StatementSync;
+  readonly #listCallsByTask: StatementSync;
   readonly #insertTask: StatementSync;
   readonly #getTask: StatementSync;
   readonly #insertVerification: StatementSync;
@@ -113,6 +114,9 @@ export class SqliteStorage implements StoragePort {
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       );
       this.#listCalls = this.#db.prepare("SELECT * FROM tool_calls ORDER BY id DESC LIMIT ?");
+      this.#listCallsByTask = this.#db.prepare(
+        "SELECT * FROM tool_calls WHERE task_id = ? ORDER BY id DESC LIMIT ?",
+      );
       this.#insertTask = this.#db.prepare(
         "INSERT INTO tasks (task_id, created_at, task_json) VALUES (?, ?, ?)",
       );
@@ -210,13 +214,17 @@ export class SqliteStorage implements StoragePort {
     return out;
   }
 
-  async listToolCalls(options: { limit?: number } = {}): Promise<ToolCallTrace[]> {
+  async listToolCalls(options: { limit?: number; taskId?: string } = {}): Promise<ToolCallTrace[]> {
     const limit = options.limit ?? -1; // SQLite: a negative LIMIT means no limit.
     if (options.limit !== undefined && (!Number.isInteger(limit) || limit < 0)) {
       throw new RangeError("limit must be a non-negative integer");
     }
     const traces: ToolCallTrace[] = [];
-    for (const row of this.#listCalls.all(limit) as unknown as ToolCallRow[]) {
+    const rows =
+      options.taskId === undefined
+        ? this.#listCalls.all(limit)
+        : this.#listCallsByTask.all(options.taskId, limit);
+    for (const row of rows as unknown as ToolCallRow[]) {
       const trace = rowToTrace(row);
       if (trace) traces.push(trace);
     }
