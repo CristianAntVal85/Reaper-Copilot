@@ -181,13 +181,19 @@ describe("exportReplayRun", () => {
     await expect(readdir(out)).rejects.toMatchObject({ code: "ENOENT" });
   });
 
-  it("fails without writing when a host path survives the scrub", async () => {
+  it.each([
+    "/home/someone/secret.wav",
+    "C:/Users/someone/secret.wav",
+    "C:\\Users\\someone\\secret.wav",
+    "/Users/someone/secret.wav",
+    "/root/secret.wav",
+  ])("fails without writing when a host path survives the scrub (%s)", async (leak) => {
     await seed(TASK_ID, "source.wav", "2026-01-01T00:00:00.000Z");
     await storage.recordToolCall({
       sessionId: "s1",
       step: 3,
       tool: "x",
-      args: { file: "/home/someone/secret.wav" },
+      args: { file: leak },
       ok: true,
       result: {},
       errorCode: null,

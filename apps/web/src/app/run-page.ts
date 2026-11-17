@@ -1,5 +1,5 @@
 import { DatePipe, DecimalPipe } from "@angular/common";
-import { Component, computed, inject, input, signal } from "@angular/core";
+import { Component, computed, effect, inject, input, signal, untracked } from "@angular/core";
 import { RouterLink } from "@angular/router";
 import type { ReplayRun } from "@reaper-copilot/core";
 import { AudioPanel } from "./audio-panel";
@@ -38,7 +38,7 @@ type RunState = { kind: "loading" } | { kind: "error" } | { kind: "ready"; run: 
           <dd>{{ targetText() }}</dd>
           <dt>Date</dt>
           <dd>{{ r.createdAt | date: DATE_FORMAT : "UTC" }}</dd>
-          <dt>Result</dt>
+          <dt>Final result</dt>
           <dd>
             <span class="badge result-badge" [class.pass]="lastPass()" [class.fail]="!lastPass()">{{
               lastPass() ? "Pass" : "Fail"
@@ -188,18 +188,30 @@ export class RunPage {
     return JSON.stringify(x, null, 2);
   }
 
+  private loadSeq = 0;
+
   constructor() {
-    queueMicrotask(() => void this.load());
+    // Reload whenever the route's taskId changes: the router reuses this component when only
+    // the hash changes (another run pasted in the same tab, back/forward).
+    effect(() => {
+      const taskId = this.taskId();
+      untracked(() => void this.load(taskId));
+    });
   }
 
   selectAttempt(index: number): void {
     this.selection.set(index);
   }
 
-  private async load(): Promise<void> {
+  private async load(taskId: string): Promise<void> {
+    const seq = ++this.loadSeq;
+    this.state.set({ kind: "loading" });
+    this.selection.set(null);
     try {
-      this.state.set({ kind: "ready", run: await this.runs.loadRun(this.taskId()) });
+      const run = await this.runs.loadRun(taskId);
+      if (seq === this.loadSeq) this.state.set({ kind: "ready", run });
     } catch (error) {
+      if (seq !== this.loadSeq) return; // a newer navigation owns the page
       console.error("Failed to load run", error);
       this.state.set({ kind: "error" });
     }

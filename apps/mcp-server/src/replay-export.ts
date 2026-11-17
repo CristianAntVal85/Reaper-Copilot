@@ -66,7 +66,14 @@ function scrubPaths<T>(value: T, root: string): T {
   return walk(value) as T;
 }
 
-const LEAK_PATTERNS: readonly RegExp[] = [/\/home\//, /\/mnt\//, /\\\\wsl/i, /(^|[^A-Za-z])[A-Za-z]:\\/];
+const LEAK_PATTERNS: readonly RegExp[] = [
+  /\/home\//,
+  /\/mnt\//,
+  /\/Users\//,
+  /\/root\//,
+  /\\\\wsl/i,
+  /(^|[^A-Za-z])[A-Za-z]:[\\/]/,
+];
 
 /** Throws if any string in the value still looks like a host path (home, mounts, WSL shares, drive letters). */
 function assertNoPathLeaks(value: unknown): void {
