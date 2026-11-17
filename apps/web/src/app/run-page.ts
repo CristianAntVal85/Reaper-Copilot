@@ -1,4 +1,4 @@
-import { DatePipe } from "@angular/common";
+import { DatePipe, DecimalPipe } from "@angular/common";
 import { Component, computed, inject, input, signal } from "@angular/core";
 import { RouterLink } from "@angular/router";
 import type { ReplayRun } from "@reaper-copilot/core";
@@ -12,7 +12,7 @@ type RunState = { kind: "loading" } | { kind: "error" } | { kind: "ready"; run: 
 
 @Component({
   selector: "app-run-page",
-  imports: [RouterLink, DatePipe, AudioPanel],
+  imports: [RouterLink, DatePipe, DecimalPipe, AudioPanel],
   template: `
     @switch (state().kind) {
       @case ("loading") {
@@ -135,7 +135,7 @@ type RunState = { kind: "loading" } | { kind: "error" } | { kind: "ready"; run: 
                   <span class="step-status" [class.fail]="!s.ok">{{
                     s.ok ? "ok" : s.errorCode
                   }}</span>
-                  <span class="run-meta">{{ s.durationMs }} ms</span>
+                  <span class="run-meta">{{ s.durationMs | number: "1.0-0" }} ms</span>
                   <span class="run-meta">{{ s.startedAt | date: "HH:mm:ss 'UTC'" : "UTC" }}</span>
                 </summary>
                 <h3>Arguments</h3>
