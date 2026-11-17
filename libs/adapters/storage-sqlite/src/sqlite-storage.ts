@@ -3,11 +3,15 @@ import { dirname } from "node:path";
 import { DatabaseSync, type StatementSync } from "node:sqlite";
 import {
   AudioFeaturesSchema,
+  TaskSchema,
   ToolCallTraceSchema,
+  VerificationSchema,
   type AnalysisCacheKey,
   type AudioFeatures,
   type StoragePort,
+  type Task,
   type ToolCallTrace,
+  type Verification,
 } from "@reaper-copilot/core";
 
 /**
@@ -39,6 +43,19 @@ const MIGRATIONS: readonly string[] = [
      started_at TEXT NOT NULL,
      cache_hits INTEGER NOT NULL
    );`,
+  `CREATE TABLE tasks (
+     task_id TEXT PRIMARY KEY,
+     created_at TEXT NOT NULL,
+     task_json TEXT NOT NULL
+   );
+   CREATE TABLE task_verifications (
+     task_id TEXT NOT NULL,
+     attempt INTEGER NOT NULL,
+     verified_at TEXT NOT NULL,
+     verification_json TEXT NOT NULL,
+     UNIQUE (task_id, attempt)
+   );
+   ALTER TABLE tool_calls ADD COLUMN task_id TEXT;`,
 ];
 
 export interface SqliteStorageOptions {
@@ -57,6 +74,7 @@ interface ToolCallRow {
   duration_ms: number;
   started_at: string;
   cache_hits: number;
+  task_id: string | null;
 }
 
 /**
@@ -70,6 +88,10 @@ export class SqliteStorage implements StoragePort {
   readonly #putCache: StatementSync;
   readonly #insertCall: StatementSync;
   readonly #listCalls: StatementSync;
+  readonly #insertTask: StatementSync;
+  readonly #getTask: StatementSync;
+  readonly #insertVerification: StatementSync;
+  readonly #listVerifications: StatementSync;
 
   constructor(options: SqliteStorageOptions) {
     if (options.path !== ":memory:") mkdirSync(dirname(options.path), { recursive: true });
@@ -87,10 +109,21 @@ export class SqliteStorage implements StoragePort {
       );
       this.#insertCall = this.#db.prepare(
         `INSERT INTO tool_calls
-           (session_id, step, tool, args_json, ok, result_json, error_code, duration_ms, started_at, cache_hits)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           (session_id, step, tool, args_json, ok, result_json, error_code, duration_ms, started_at, cache_hits, task_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       );
       this.#listCalls = this.#db.prepare("SELECT * FROM tool_calls ORDER BY id DESC LIMIT ?");
+      this.#insertTask = this.#db.prepare(
+        "INSERT INTO tasks (task_id, created_at, task_json) VALUES (?, ?, ?)",
+      );
+      this.#getTask = this.#db.prepare("SELECT task_json FROM tasks WHERE task_id = ?");
+      this.#insertVerification = this.#db.prepare(
+        `INSERT INTO task_verifications (task_id, attempt, verified_at, verification_json)
+         VALUES (?, ?, ?, ?)`,
+      );
+      this.#listVerifications = this.#db.prepare(
+        "SELECT verification_json FROM task_verifications WHERE task_id = ? ORDER BY attempt ASC",
+      );
     } catch (error) {
       this.#db.close();
       throw error;
@@ -132,7 +165,42 @@ export class SqliteStorage implements StoragePort {
       t.durationMs,
       t.startedAt,
       t.cacheHits,
+      t.taskId,
     );
+  }
+
+  async createTask(task: Task): Promise<void> {
+    const t = TaskSchema.parse(task);
+    this.#insertTask.run(t.taskId, t.createdAt, JSON.stringify(t));
+  }
+
+  async getTask(taskId: string): Promise<Task | null> {
+    const row = this.#getTask.get(taskId);
+    if (row === undefined) return null;
+    try {
+      const parsed = TaskSchema.safeParse(JSON.parse(String(row["task_json"])));
+      return parsed.success ? parsed.data : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async recordVerification(verification: Verification): Promise<void> {
+    const v = VerificationSchema.parse(verification);
+    this.#insertVerification.run(v.taskId, v.attempt, v.verifiedAt, JSON.stringify(v));
+  }
+
+  async listVerifications(taskId: string): Promise<Verification[]> {
+    const out: Verification[] = [];
+    for (const row of this.#listVerifications.all(taskId)) {
+      try {
+        const parsed = VerificationSchema.safeParse(JSON.parse(String(row["verification_json"])));
+        if (parsed.success) out.push(parsed.data);
+      } catch {
+        // invalid row: left out
+      }
+    }
+    return out;
   }
 
   async listToolCalls(options: { limit?: number } = {}): Promise<ToolCallTrace[]> {
@@ -166,6 +234,7 @@ function rowToTrace(row: ToolCallRow): ToolCallTrace | null {
       durationMs: row.duration_ms,
       startedAt: row.started_at,
       cacheHits: row.cache_hits,
+      taskId: row.task_id,
     });
     return parsed.success ? parsed.data : null;
   } catch {

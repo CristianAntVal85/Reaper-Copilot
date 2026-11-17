@@ -26,6 +26,8 @@ export const ToolCallTraceSchema = z
     durationMs: z.number().finite().min(0),
     startedAt: z.iso.datetime(),
     cacheHits: z.number().int().min(0),
+    /** Task the call is attributed to, if any. */
+    taskId: z.string().min(1).nullable(),
   })
   .refine((t) => (t.ok ? t.errorCode === null : t.errorCode !== null && t.result === null), {
     message: "ok traces carry no errorCode; failed traces carry an errorCode and a null result",

@@ -96,6 +96,7 @@ export async function invokeTool(
     durationMs: performance.now() - started,
     startedAt,
     cacheHits,
+    taskId: null,
   };
   const trace: ToolCallTrace =
     "output" in outcome

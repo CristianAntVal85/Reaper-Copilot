@@ -39,6 +39,7 @@ describe("FakeStorage", () => {
         durationMs: 0,
         startedAt: "2026-01-01T00:00:00Z",
         cacheHits: 0,
+        taskId: null,
       }),
     ).rejects.toThrow("disk full");
     expect(storage.traces).toEqual([]);
