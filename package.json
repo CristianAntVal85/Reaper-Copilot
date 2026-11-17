@@ -14,7 +14,8 @@
     "test:reaper": "nx run-many -t test:reaper",
     "mcp:call": "node apps/mcp-server/scripts/mcp-call.ts",
     "reaper:bridge": "node apps/mcp-server/scripts/reaper-bridge.ts",
-    "mcp:traces": "node apps/mcp-server/scripts/mcp-traces.ts"
+    "mcp:traces": "node apps/mcp-server/scripts/mcp-traces.ts",
+    "replay:export": "node apps/mcp-server/scripts/replay-export.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

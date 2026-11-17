@@ -186,7 +186,7 @@ Riesgos:
     - Una salida existente da código 1 y una entrada inexistente código 2.
     - La prueba de contrato valida la salida real con `ReplayAssetsSchema`.
     - `pnpm check:full` en verde.
-- [ ] **T3. Exportador `pnpm replay:export`.**
+- [x] **T3. Exportador `pnpm replay:export`.**
   - Cambios: `apps/mcp-server/scripts/replay-export.ts` y el script en la raíz.
   - Hecho cuando: hay pruebas con `FakeStorage`, `FakeAnalyzer` y un workspace y una salida temporales que cubren estos casos:
     - escribe `run.json`, que valida con `ReplayRunSchema`, junto a los MP3 esperados, y regenera `index.json`;
