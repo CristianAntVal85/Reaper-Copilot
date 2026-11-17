@@ -33,6 +33,7 @@ try {
         `cacheHits=${trace.cacheHits}`,
         `step=${trace.step}`,
         `session=${trace.sessionId.slice(0, 8)}`,
+        `task=${trace.taskId?.slice(0, 8) ?? "-"}`,
       ].join(" "),
     );
   }

@@ -143,7 +143,7 @@ Riesgos:
   4. Evalúa los criterios.
   5. Guarda la verificación con su `attempt` y devuelve la salida de la sección 2.
   - Hecho cuando: con `FakeAnalyzer` y `FakeStorage`, la segunda verificación de una tarea da `attempt: 2` y las dos quedan guardadas. Un campo `criteria` en la entrada da `invalid_input`. Un `taskId` desconocido da `task_not_found`. Sin ningún `delta`, el analizador no recibe el origen. `render.path` es relativa.
-- [ ] **T6. Servidor y trazas.** `ALL_TOOLS` con 14 herramientas. Las pruebas del servidor esperan 7 en `mentor` y 14 en `agent`, con su `readOnlyHint` y ambas con `outputSchema` anunciado. `mcp-traces.ts` imprime `task=<8 primeros caracteres o ->`.
+- [x] **T6. Servidor y trazas.** `ALL_TOOLS` con 14 herramientas. Las pruebas del servidor esperan 7 en `mentor` y 14 en `agent`, con su `readOnlyHint` y ambas con `outputSchema` anunciado. `mcp-traces.ts` imprime `task=<8 primeros caracteres o ->`.
   - Hecho cuando: con el cliente MCP en memoria y fakes, en `mentor`, `analyze_audio`, `start_task` y `verify_task` dan `pass` y las trazas llevan `taskId` desde `start_task`. Un `start_task` con un `delta` que incluye 0 devuelve un error que nombra la regla.
 - [ ] **T7. Documentación.** Documento maestro v2.10:
   - **6.4:** `StoragePort` con tareas y `taskId` en `ToolCallTrace`.

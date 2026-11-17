@@ -8,9 +8,11 @@ import { listPresets } from "./list-presets.ts";
 import { renderSelection } from "./render-selection.ts";
 import { setTempo } from "./set-tempo.ts";
 import { sliceLoop } from "./slice-loop.ts";
+import { startTask } from "./start-task.ts";
 import { timeStretch } from "./time-stretch.ts";
 import type { AnyToolDefinition } from "./tool-definition.ts";
 import { undoLast } from "./undo-last.ts";
+import { verifyTask } from "./verify-task.ts";
 
 /** Every tool the copilot defines; transports register this list through a registry. */
 export const ALL_TOOLS: readonly AnyToolDefinition[] = [
@@ -26,4 +28,6 @@ export const ALL_TOOLS: readonly AnyToolDefinition[] = [
   applyFxChain,
   renderSelection,
   undoLast,
+  startTask,
+  verifyTask,
 ];
