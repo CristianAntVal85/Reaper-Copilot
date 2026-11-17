@@ -1,6 +1,6 @@
 # Reaper Copilot
 
-Documento maestro del proyecto (v2.9, 16-nov-2026). Es la fuente de verdad: sustituye a los borradores anteriores.
+Documento maestro del proyecto (v2.10, 17-nov-2026). Es la fuente de verdad: sustituye a los borradores anteriores.
 
 Lo leen tres públicos:
 
@@ -208,10 +208,11 @@ interface AnalyzerPort {
   analyze(path: AssetPath, options?: { targetBpm?: number }): Promise<AudioFeatures>;
 }
 
-// F1b. Tareas, trabajos y assets se añadirán en las fases siguientes.
+// Trabajos y assets se añadirán en las fases siguientes.
 interface AnalysisCacheKey { sha256: string; targetBpm: number | null; revision: string }
 interface ToolCallTrace {
   sessionId: string; step: number; tool: string;
+  taskId: string | null; // tarea activa de la sesión (sección 9.3)
   args: unknown; ok: boolean; result: unknown | null; errorCode: string | null;
   durationMs: number; startedAt: string; // ISO 8601
   cacheHits: number;
@@ -221,12 +222,16 @@ interface StoragePort {
   putCachedAnalysis(key: AnalysisCacheKey, features: AudioFeatures): Promise<void>;
   recordToolCall(trace: ToolCallTrace): Promise<void>;
   listToolCalls(options?: { limit?: number }): Promise<ToolCallTrace[]>; // más recientes primero
+  createTask(task: Task): Promise<void>;
+  getTask(taskId: string): Promise<Task | null>;
+  recordVerification(verification: Omit<Verification, "attempt">): Promise<Verification>; // el almacenamiento asigna attempt = MAX + 1, atómico
+  listVerifications(taskId: string): Promise<Verification[]>;    // en orden de attempt
 }
 
 interface LlmPort { runTurn(input: TurnInput): AsyncIterable<LlmEvent>; } // solo Live
 ```
 
-Son un punto de partida; el planificador puede ajustarlos. Los tipos de `DawPort` salen de esquemas zod en `libs/core` (`ProjectState`, `DawItem`, `FxChain`, `AppliedFxChain`, `JobStatus`, `PresetSchema`). `DawItem.source` es la ruta absoluta de Linux de la fuente (o `null`); las herramientas la devuelven relativa al workspace, o `null` si está fuera de él, y nunca rutas absolutas ni UNC. `AnalyzerPort` no tiene `compare`: la comparación es una función pura de `core` (`compareFeatures`) sobre dos `AudioFeatures`, así reutiliza la caché y no vuelve a cargar librosa.
+Son un punto de partida; el planificador puede ajustarlos. Los tipos de `DawPort` salen de esquemas zod en `libs/core` (`ProjectState`, `DawItem`, `FxChain`, `AppliedFxChain`, `JobStatus`, `PresetSchema`); los de tarea (`Task`, `Verification`, criterios y su evaluación) están en `libs/core/src/task.ts`. `DawItem.source` es la ruta absoluta de Linux de la fuente (o `null`); las herramientas la devuelven relativa al workspace, o `null` si está fuera de él, y nunca rutas absolutas ni UNC. `AnalyzerPort` no tiene `compare`: la comparación es una función pura de `core` (`compareFeatures`) sobre dos `AudioFeatures`, así reutiliza la caché y no vuelve a cargar librosa.
 
 ---
 
@@ -241,8 +246,8 @@ Conjunto cerrado. Pocas, de alto nivel y con descripciones claras.
 | `get_project_state` | lectura | Pistas, items y tempo del proyecto: `{ tempo, lengthSec, tracks: [{ id, name, fx, items: [{ id, trackId, positionSec, lengthSec, startOffsetSec, playRate, source }] }] }`. Los ids son GUID de Reaper; `source` es relativa al workspace o `null` |
 | `list_presets` | lectura | Presets de FX con sus `knobs`: `{ presets: [{ id, description, knobs: { <nombre>: { description, unit, min, max, default } } }] }` |
 | `get_job_status` | lectura | Entrada `{ jobId }`. Salida `{ jobId, status: "rendering" \| "done" \| "failed", output: { path, durationSec } \| null, errorCode \| null }`; `path` relativa al workspace. Responde sin preguntar a Reaper. No anuncia `outputSchema` por MCP (unión discriminada) |
-| `verify_task` | lectura | Mide el render y devuelve el resultado por criterio (sección 9.2). No acepta criterios |
-| `start_task` | modifica (ligero) | Registra la petición literal, el audio de origen, el objetivo y los criterios (sección 9.2) |
+| `start_task` | lectura | `{ request, source, target?, criteria? }` → `{ taskId, criteria }`. Registra la petición literal, el audio de origen (guardado relativo al workspace, con `/`), el objetivo y los criterios (sección 9.2) y devuelve todos los que se evaluarán, los derivados primero. Máximo 100 tareas por sesión del servidor: la siguiente da `out_of_range`. No toca Reaper, solo guarda la tarea en SQLite: por eso es de lectura (decisión del usuario, 17-nov-2026; así, en `mentor`, el usuario renderiza a mano y Claude fija los criterios y verifica) |
+| `verify_task` | lectura | `{ taskId, path }` → `{ taskId, attempt, render, pass, results }`. `taskId` es un uuid (otro valor da `invalid_input`). `path` es cualquier audio del workspace, no solo `renders/`; en la respuesta sale relativa al workspace aunque llegue absoluta. Máximo 50 verificaciones por tarea: la siguiente da `out_of_range` sin analizar nada. Mide ese audio y devuelve el resultado por criterio (sección 9.2). No acepta criterios; `task_not_found` si la tarea no existe; una tarea guardada que no pasa su esquema es `internal_error`, no `task_not_found` |
 | `import_audio` | modifica | `{ path }` → `{ track, item }`. Importa desde el workspace en una pista nueva; el original no se toca |
 | `set_tempo` | modifica | `{ bpm }` (40-320) → `{ tempo }` |
 | `slice_loop` | modifica | `{ itemId, sourceBpm, startBar, bars, beatsPerBar?, offsetSec? }` → item. Corte absoluto (idempotente); `out_of_range` si se sale de la fuente |
@@ -251,7 +256,7 @@ Conjunto cerrado. Pocas, de alto nivel y con descripciones claras.
 | `render_selection` | modifica | `{ itemId }` → `{ jobId }`. Asíncrono. Renderiza la mezcla del master (otras pistas que suenen en ese tramo entran en el render) en los límites del item, a `workspace/renders/<AAAAMMDD-HHMMSS UTC>-<8 hex>.wav` (nombre generado por el servidor) |
 | `undo_last` | modifica | `{}` → `{ undone }`. Deshace el último bloque solo si su etiqueta empieza por `Copilot: `; si no, `nothing_to_undo`. Nunca deshace trabajo del usuario |
 
-En modo `mentor` solo se exponen las de lectura: en F2a, cinco (`get_project_state`, `list_presets`, `get_job_status`, `analyze_audio`, `compare_audio`). En `agent`, las 12 de F2a (`start_task` y `verify_task` llegan en F2b).
+En modo `mentor` solo se exponen las de lectura: siete (`get_project_state`, `list_presets`, `get_job_status`, `analyze_audio`, `compare_audio`, `start_task`, `verify_task`). En `agent`, las 14. `start_task` anuncia `readOnlyHint: true` aunque escribe en SQLite: solo registra la tarea y no cambia el proyecto del usuario.
 
 **Presets de FX como datos.** Las cadenas son JSON versionado en `reaper/presets/` (un archivo por preset, validado con `PresetSchema` al arrancar el servidor; uno inválido impide el arranque), con plugins de serie de Reaper. Cada parámetro es un `knob` (ajustable dentro de su rango, con `description`, `unit`, `min`, `max` y `default`) o un `value` fijo; todo `knob` usado debe estar definido y `default` ha de caer en `[min, max]`. Los valores van en unidades mostradas (dB, Hz, %), no normalizados. Presets de F2a, provisionales: `distortion_hard` (`JS: Waveshaping Distortion` y `ReaLimit`; knobs `drive` 0-90 % y `threshold` −12..0 dB), `limiter_loud` (`ReaLimit`; `threshold` −12..0 dB y `ceiling` −3..0 dB) y `eq_lowcut` (`ReaEQ`, paso alto; `cutoff` 20-200 Hz). `COPILOT_PRESETS` cambia la carpeta.
 
@@ -284,7 +289,7 @@ En modo `mentor` solo se exponen las de lectura: en F2a, cinco (`get_project_sta
 - **Sonoridad y dinámica.** `integratedLufs` con pyloudnorm. `peakDb` es el pico de muestra del audio decodificado, entre todos los canales. No es pico real (*true peak*) y en formatos con pérdida puede superar 0 dBFS (medido: los MP3 de prueba, masterizados a ~−4 LUFS, tienen entre el 1 y el 3 % de muestras por encima de 0 dBFS y picos de hasta +5,45 dB). `crestFactorDb` es el pico menos el RMS global, con mínimo 0.
 - **Bandas** (Hz, intervalos [bajo, alto)): `sub` 20-60, `bass` 60-250, `lowMid` 250-500, `mid` 500-2000, `highMid` 2000-6000, `high` 6000-20000. Se calculan sobre la mezcla mono con Welch, en dB relativos a un seno de fondo de escala: un seno a −12 dBFS da −12 en su banda.
 - **Números finitos.** Lo que saldría como menos infinito (silencio) se limita a −120. Redondeo: dB y BPM a 2 decimales, confianzas a 3.
-- **Errores de dominio** (`CopilotError`, lista cerrada de códigos): `path_outside_workspace`, `file_not_found`, `unsupported_format`, `analysis_failed`, `analysis_timeout`, `invalid_analysis_output`, y desde F2a los de Reaper: `daw_unavailable` (sin señal de vida reciente o puente no cargado), `daw_timeout`, `daw_busy` (render en curso), `daw_error` (fallo del puente sin código propio), `invalid_daw_output` (respuesta del puente fuera de su esquema), `item_not_found`, `track_not_found`, `preset_not_found`, `job_not_found`, `out_of_range` (corte fuera de la fuente, tasa fuera de [0,5, 2], valor fuera del rango del plugin o de un `knob`), `nothing_to_undo` y `render_failed`. El mensaje es fijo por código, sin rutas ni texto de Reaper; el detalle va al registro. El servidor MCP los devuelve con `isError: true` y el código al principio del mensaje. Hay además dos códigos de protocolo, fuera de la lista de dominio: `internal_error` (error inesperado o salida de una herramienta fuera de su esquema; antes esto último daba `invalid_analysis_output`), con el mensaje `internal_error: the tool failed unexpectedly`, e `invalid_input` (entrada que no cumple el esquema; mensaje fijo). El detalle de ambos solo va al registro (stderr).
+- **Errores de dominio** (`CopilotError`, lista cerrada de códigos): `path_outside_workspace`, `file_not_found`, `unsupported_format`, `analysis_failed`, `analysis_timeout`, `invalid_analysis_output`, y desde F2a los de Reaper: `daw_unavailable` (sin señal de vida reciente o puente no cargado), `daw_timeout`, `daw_busy` (render en curso), `daw_error` (fallo del puente sin código propio), `invalid_daw_output` (respuesta del puente fuera de su esquema), `item_not_found`, `track_not_found`, `preset_not_found`, `job_not_found`, `out_of_range` (corte fuera de la fuente, tasa fuera de [0,5, 2], valor fuera del rango del plugin o de un `knob`), `nothing_to_undo` y `render_failed`; y desde F2b, `task_not_found` (`verify_task` con un `taskId` desconocido); `out_of_range` cubre además los topes de 100 tareas por sesión y 50 verificaciones por tarea. Las reglas de los criterios no tienen código propio: las aplica el esquema zod y el SDK rechaza la entrada y devuelve el mensaje de zod al cliente. El mensaje es fijo por código, sin rutas ni texto de Reaper; el detalle va al registro. El servidor MCP los devuelve con `isError: true` y el código al principio del mensaje. Hay además dos códigos de protocolo, fuera de la lista de dominio: `internal_error` (error inesperado o salida de una herramienta fuera de su esquema; antes esto último daba `invalid_analysis_output`), con el mensaje `internal_error: the tool failed unexpectedly`, e `invalid_input` (entrada que no cumple el esquema; mensaje fijo). El detalle de ambos solo va al registro (stderr).
 - **Adaptador** (`libs/adapters/analysis-py`): proceso hijo sin shell, tiempo límite de 120 s por defecto, stdout de 1 MB como máximo y stderr truncado a 8 KiB. La salida se valida con el esquema antes de devolverla.
 - **Rutas.** Relativas al workspace (`<repositorio>/workspace` por defecto, ignorado por git y que hay que crear; se cambia con `COPILOT_WORKSPACE`) o absolutas dentro de él. Se comprueba de forma léxica y otra vez tras `realpath`; extensiones admitidas: `.wav .flac .mp3 .aiff .ogg`.
 - **Servidor MCP** (`apps/mcp-server`, stdio). Variables: `MODE` (`mentor` por defecto; un valor inválido hace fallar el arranque), `COPILOT_WORKSPACE` y `COPILOT_PYTHON` (por defecto `python/analysis/.venv/bin/python`); las de Reaper en la sección 8.2. El `.mcp.json` de la raíz lo registra con `MODE=mentor`; para `agent` se registra en ámbito local: `claude mcp add --scope local reaper-copilot -e MODE=agent -- node apps/mcp-server/src/main.ts`. `pnpm mcp:call <herramienta> '<json>'` llama a una herramienta desde la terminal. `COPILOT_DATA_DIR` fija dónde se guarda la base SQLite (sección 9.3). `pnpm mcp:traces [n]` imprime las últimas `n` trazas. Medido: `analyze_audio` tarda 1,7 s la primera vez (casi todo arranque de librosa) y 0,2 s desde la caché; `compare_audio`, 7,8 s frente a 0,25 s.
@@ -367,41 +372,53 @@ Un criterio es un dato, no texto libre. El esquema vive en zod en `libs/core` y 
 }
 ```
 
+**Entrada:** `{ request, source, target?, criteria? }`. `request` tiene de 1 a 2000 caracteres; `source` es una ruta del workspace (se valida antes de guardar nada); `target` vale `{}` por omisión y `criteria`, `[]` (hasta 16 criterios propios).
+
 **Criterio:** `{ id, metric, basis, min?, max? }`.
 
+- `id`: patrón `^[a-z0-9][a-z0-9-]{0,39}$`, único en la tarea. `duration` y `tempo` están reservados para los derivados.
 - `metric`: lista cerrada, con las rutas numéricas del análisis (sección 8.1): `file.durationSec`, `tempo.bpm`, `loudness.integratedLufs`, `loudness.peakDb`, `bands.*`, `dynamics.crestFactorDb`. Una métrica nueva exige ampliar primero el análisis.
 - `basis`: `absolute` compara el valor del render; `delta` compara render menos origen, en las unidades de la métrica. "Más" o "menos" de algo es siempre `delta`.
-- `min` y `max`: límites inclusivos; al menos uno. Un objetivo con tolerancia se expresa con los dos.
+- `min` y `max`: límites inclusivos; al menos uno, y `min ≤ max`. Un objetivo con tolerancia se expresa con los dos.
+- `target`: `{ bpm?, bars?, beatsPerBar? }` con `bpm` de 60 a 320, `bars` de 1 a 64 y `beatsPerBar` de 1 a 12 (por omisión 4). `bars` exige `bpm`.
 
-**Reglas que aplica el servidor, no el LLM:**
+**Reglas que aplica el servidor, no el LLM** (en el esquema zod; el SDK devuelve sus mensajes al cliente):
 
-1. Al menos un criterio, con `id` únicos.
+1. **Al menos un criterio contando los derivados**, con `id` únicos. Así el caso básico «loop a 170» no obliga a inventar un criterio propio.
 2. **Los criterios se fijan en `start_task`.** `verify_task` no acepta criterios: cambiarlos exige una tarea nueva, que queda en la traza. El LLM no puede mover la meta después de ver el resultado.
 3. **Un criterio `delta` debe excluir el cero** (`min > 0` o `max < 0`): no puede cumplirse sin cambiar nada.
-4. **Criterios obligatorios derivados de `target`**, que el LLM no puede quitar:
-   - Con `bpm` y `bars`: duración del render igual a `bars × beatsPerBar × 60 / bpm` con ±20 ms (4 compases a 170 BPM son 5,647 s). Es la comprobación principal del tempo, porque es determinista.
-   - Con `bpm`: `tempo.bpm` dentro de ±1, analizado con el objetivo para elegir la octava (sección 8.1); el criterio usa la desviación de `tempo.target` (`matches`, ±1 BPM). Si la detección no es fiable, el resultado es `unmeasured`, no `fail`.
+4. **Criterios obligatorios derivados de `target`**, que el LLM no puede quitar. `start_task` los guarda con `derived: true` y los devuelve antes que los propios:
+   - Con `bpm` y `bars`, `duration`: duración del render igual a `bars × beatsPerBar × 60 / bpm` con ±20 ms (4 compases a 170 BPM son 5,647 s). Es la comprobación principal del tempo, porque es determinista.
+   - Con `bpm`, `tempo`: `tempo.bpm` dentro de ±1, analizado con el objetivo para elegir la octava (sección 8.1); usa `tempo.target.matches` (±1 BPM). Es `unmeasured`, no `fail`, si la confianza del tempo del render es menor que 0,10.
+
+**Verificación (`verify_task`).** Entrada estricta `{ taskId: uuid, path }`; `path` es cualquier audio del workspace. El render se analiza con `targetBpm = target.bpm`. El origen se analiza solo si hay algún criterio `delta`, y sin `targetBpm`. Los criterios propios sobre `tempo.bpm` son `unmeasured` con confianza baja (la del render y, en un `delta`, también la del origen). En un `delta`, `measured` es render menos origen con 2 decimales y se compara ya redondeado.
 
 **Salida de `verify_task`:**
 
 ```json
 {
   "taskId": "…",
+  "attempt": 1,
+  "render": { "path": "renders/20261117-101500-ab12cd34.wav", "sha256": "…" },
   "pass": false,
   "results": [
-    { "id": "duration", "derived": true, "status": "pass", "measured": 5.646, "min": 5.627, "max": 5.667 },
-    { "id": "more-distortion", "status": "fail", "measured": -1.8, "sourceValue": 9.7, "renderValue": 7.9, "max": -3 }
+    { "id": "duration", "derived": true, "metric": "file.durationSec", "basis": "absolute", "status": "pass",
+      "measured": 5.646, "min": 5.627, "max": 5.667, "sourceValue": null, "renderValue": null },
+    { "id": "more-distortion", "derived": false, "metric": "dynamics.crestFactorDb", "basis": "delta", "status": "fail",
+      "measured": -1.8, "min": null, "max": -3, "sourceValue": 9.7, "renderValue": 7.9 }
   ]
 }
 ```
 
-- `status`: `pass`, `fail` o `unmeasured`. `pass` global exige que ninguno sea `fail` y que los derivados de duración sean `pass`.
+- Todos los campos van siempre; los que no aplican son `null` (`sourceValue` y `renderValue` en `absolute`, `min` o `max` ausentes); `measured` es siempre un número, también en `unmeasured`. La forma es fija porque una unión por `basis` no pasa por el SDK y el Replay la lee mejor.
+- `status`: `pass`, `fail` o `unmeasured`. `pass` global exige que ninguno sea `fail` y que `duration`, si existe, sea `pass`.
+- `attempt` lo asigna el almacenamiento, no la herramienta: el máximo `attempt` de la tarea más uno, en una sola sentencia (también sobre filas corruptas), con `UNIQUE(task_id, attempt)` como red. `render.path` es relativa al workspace, con `/`, aunque el cliente la mande absoluta. Máximo 50 verificaciones por tarea.
 - El resultado incluye siempre el valor medido, para que el LLM ajuste parámetros con números y el Replay los muestre.
 
 ### 9.3 Trazas y exportación para el Replay
 
-- Cada llamada a herramienta se guarda en SQLite (`node:sqlite`, `<repositorio>/.copilot/copilot.db`, o `COPILOT_DATA_DIR`; modo WAL y `busy_timeout` de 5 s, porque el servidor de Claude Code y `pnpm mcp:call` pueden abrirlo a la vez): sesión, paso, herramienta, argumentos, resultado, código de error, duración, marca de tiempo y aciertos de caché. Una fila por llamada, también las que fallan.
-- **Sin tarea hasta la fase 2.** El `taskId` llega con `start_task`. Mientras tanto, `sessionId` es un UUID por arranque del servidor y `step` cuenta desde 1 en cada sesión (con `pnpm mcp:call`, que arranca un servidor por llamada, siempre es 1).
+- Cada llamada a herramienta se guarda en SQLite (`node:sqlite`, `<repositorio>/.copilot/copilot.db`, o `COPILOT_DATA_DIR`; modo WAL y `busy_timeout` de 5 s, porque el servidor de Claude Code y `pnpm mcp:call` pueden abrirlo a la vez): sesión, paso, tarea, herramienta, argumentos, resultado, código de error, duración, marca de tiempo y aciertos de caché. Una fila por llamada, también las que fallan.
+- **Tarea activa por sesión.** Las tareas y sus verificaciones se guardan en SQLite (tablas `tasks` y `task_verifications`). `start_task`, si sale bien, fija la tarea activa de la sesión; desde entonces cada traza lleva su `taskId`, incluida la de `start_task`. `verify_task` lleva el `taskId` de su entrada. Antes del primer `start_task`, `taskId` es `null`, igual que en las filas anteriores a F2b. `sessionId` es un UUID por arranque del servidor y `step` cuenta desde 1 en cada sesión (con `pnpm mcp:call`, que arranca un servidor por llamada, siempre es 1). `pnpm mcp:traces` imprime `task=<8 primeros caracteres>` o `-`.
 - Las trazas no llevan rutas absolutas ni la causa de los errores. Un fallo al escribir la traza o la caché se registra por stderr y no rompe la herramienta.
 - **Caché de análisis.** Clave: sha256 de los bytes del archivo, `targetBpm` (o `null`) y `revision = "<schemaVersion>.<ANALYSIS_REVISION>"`. `ANALYSIS_REVISION` es una constante de `libs/core` que se sube a mano al cambiar el método de análisis de Python. Lo leído de la caché se valida con `AudioFeaturesSchema`; si no pasa, se analiza de nuevo.
 - Un comando `export-replay` genera, por cada ejecución elegida, una carpeta con `run.json` (petición, pasos, criterios, resultados, análisis) y los audios antes y después en formato comprimido.

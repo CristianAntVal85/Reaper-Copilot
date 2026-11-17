@@ -41,6 +41,9 @@ beforeEach(async () => {
       cacheHit: () => {
         hits += 1;
       },
+      taskStarted: () => {},
+      forTask: () => {},
+      reserveTask: () => true,
     },
   };
 });

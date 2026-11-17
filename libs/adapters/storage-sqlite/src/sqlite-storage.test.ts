@@ -32,6 +32,28 @@ function open(path = join(dir, "copilot.db")): SqliteStorage {
   return storage;
 }
 
+const V1_SQL = `CREATE TABLE analysis_cache (
+     sha256 TEXT NOT NULL,
+     target_bpm REAL NOT NULL,
+     revision TEXT NOT NULL,
+     features_json TEXT NOT NULL,
+     created_at TEXT NOT NULL,
+     PRIMARY KEY (sha256, target_bpm, revision)
+   );
+   CREATE TABLE tool_calls (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     session_id TEXT NOT NULL,
+     step INTEGER NOT NULL,
+     tool TEXT NOT NULL,
+     args_json TEXT NOT NULL,
+     ok INTEGER NOT NULL,
+     result_json TEXT NOT NULL,
+     error_code TEXT,
+     duration_ms REAL NOT NULL,
+     started_at TEXT NOT NULL,
+     cache_hits INTEGER NOT NULL
+   );`;
+
 let counter = 0;
 describeStorageBehaviour("SqliteStorage", async () => open(join(dir, `case-${counter++}.db`)));
 
@@ -57,7 +79,7 @@ describe("SqliteStorage", () => {
     open(path).close();
     open(path);
     const raw = new DatabaseSync(path);
-    expect(raw.prepare("SELECT version FROM schema_version").all()).toEqual([{ version: 1 }]);
+    expect(raw.prepare("SELECT version FROM schema_version").all()).toEqual([{ version: 1 }, { version: 2 }]);
     raw.close();
   });
 
@@ -86,6 +108,7 @@ describe("SqliteStorage", () => {
       durationMs: 1,
       startedAt: "2026-01-01T00:00:00Z",
       cacheHits: 0,
+      taskId: null,
     });
     expect(await a.listToolCalls()).toHaveLength(1);
   });
@@ -112,6 +135,67 @@ describe("SqliteStorage", () => {
     raw.exec("INSERT INTO schema_version VALUES (99)");
     raw.close();
     expect(() => new SqliteStorage({ path })).toThrow(/newer/);
+  });
+
+  it("migrates a version 1 database and reads its traces with taskId null", async () => {
+    const path = join(dir, "v1.db");
+    const raw = new DatabaseSync(path);
+    raw.exec(V1_SQL);
+    raw.exec("CREATE TABLE schema_version (version INTEGER NOT NULL); INSERT INTO schema_version VALUES (1)");
+    raw
+      .prepare(
+        `INSERT INTO tool_calls (session_id, step, tool, args_json, ok, result_json, error_code, duration_ms, started_at, cache_hits)
+         VALUES ('s', 1, 'analyze_audio', '{"path":"a.wav"}', 1, '{"bpm":120}', NULL, 3, '2026-01-01T00:00:00.000Z', 0)`,
+      )
+      .run();
+    raw.close();
+    const storage = open(path);
+    const [trace] = await storage.listToolCalls();
+    expect(trace).toMatchObject({ step: 1, tool: "analyze_audio", taskId: null });
+    await storage.recordToolCall({ ...(trace as NonNullable<typeof trace>), step: 2, taskId: "t1" });
+    expect((await storage.listToolCalls()).map((t) => t.taskId)).toEqual(["t1", null]);
+  });
+
+  it("throws for a stored task that fails the schema, and returns null for a missing one", async () => {
+    const path = join(dir, "copilot.db");
+    open(path).close();
+    const raw = new DatabaseSync(path);
+    raw.exec("INSERT INTO tasks VALUES ('bad', '2026-01-01T00:00:00Z', '{}')");
+    raw.exec("INSERT INTO tasks VALUES ('junk', '2026-01-01T00:00:00Z', 'not json')");
+    raw.close();
+    const storage = open(path);
+    await expect(storage.getTask("bad")).rejects.toThrow("invalid");
+    await expect(storage.getTask("junk")).rejects.toThrow("invalid");
+    expect(await storage.getTask("missing")).toBeNull();
+  });
+
+  it("assigns the next attempt over a corrupt verification row", async () => {
+    const path = join(dir, "copilot.db");
+    open(path).close();
+    const raw = new DatabaseSync(path);
+    const id = "11111111-1111-4111-8111-111111111111";
+    raw.exec(`INSERT INTO task_verifications VALUES ('${id}', 3, '2026-01-01T00:00:00Z', 'not json')`);
+    raw.close();
+    const storage = open(path);
+    const stored = await storage.recordVerification({
+      taskId: id,
+      verifiedAt: "2026-01-01T00:01:00.000Z",
+      render: { path: "out/render.wav", sha256: "c".repeat(64) },
+      pass: true,
+      results: [],
+    });
+    expect(stored.attempt).toBe(4);
+    expect((await storage.listVerifications(id)).map((v) => v.attempt)).toEqual([4]);
+  });
+
+  it("leaves out a verification row that fails the schema", async () => {
+    const path = join(dir, "copilot.db");
+    open(path).close();
+    const raw = new DatabaseSync(path);
+    raw.exec("INSERT INTO task_verifications VALUES ('bad', 1, '2026-01-01T00:00:00Z', 'not json')");
+    raw.close();
+    const storage = open(path);
+    expect(await storage.listVerifications("bad")).toEqual([]);
   });
 
   it("rejects an invalid limit", async () => {

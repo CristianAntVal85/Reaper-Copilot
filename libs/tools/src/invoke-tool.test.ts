@@ -162,4 +162,73 @@ describe("invokeTool", () => {
     expect(analyzer.calls).toHaveLength(1);
     expect(storage.traces.map((t) => t.cacheHits)).toEqual([0, 1]);
   });
+
+  describe("task attribution", () => {
+    const starter = (taskId: string, fail = false) =>
+      defineTool({
+        name: "starter",
+        description: "Test-only.",
+        risk: "read",
+        inputSchema: z.strictObject({}),
+        outputSchema: z.strictObject({ ok: z.literal(true) }),
+        handler: async (_input, c) => {
+          c.trace?.taskStarted(taskId);
+          if (fail) throw new CopilotError("file_not_found", "boom");
+          return { ok: true as const };
+        },
+      });
+    const forTaskTool = defineTool({
+      name: "for_task",
+      description: "Test-only.",
+      risk: "read",
+      inputSchema: z.strictObject({}),
+      outputSchema: z.strictObject({ ok: z.literal(true) }),
+      handler: async (_input, c) => {
+        c.trace?.forTask("other");
+        return { ok: true as const };
+      },
+    });
+
+    it("attributes later calls to the started task and earlier ones to null", async () => {
+      await invokeTool(analyzeAudio, { path: "song.wav" }, ctx, session);
+      await invokeTool(starter("t1"), {}, ctx, session);
+      await invokeTool(analyzeAudio, { path: "song.wav" }, ctx, session);
+      expect(session.activeTaskId).toBe("t1");
+      expect(storage.traces.map((t) => t.taskId)).toEqual([null, "t1", "t1"]);
+    });
+
+    it("keeps the active task when the starting call fails, but traces the attributed id", async () => {
+      await invokeTool(starter("t1"), {}, ctx, session);
+      const result = await invokeTool(starter("t2", true), {}, ctx, session);
+      expect(result.ok).toBe(false);
+      expect(session.activeTaskId).toBe("t1");
+      expect(storage.traces.map((t) => t.taskId)).toEqual(["t1", "t2"]);
+      await invokeTool(analyzeAudio, { path: "song.wav" }, ctx, session);
+      expect(storage.traces[2]?.taskId).toBe("t1");
+    });
+
+    it("does not activate a task whose output is invalid", async () => {
+      const bad = defineTool({
+        name: "bad_start",
+        description: "Test-only.",
+        risk: "read",
+        inputSchema: z.strictObject({}),
+        outputSchema: z.strictObject({ ok: z.literal(true) }),
+        handler: async (_input, c) => {
+          c.trace?.taskStarted("t9");
+          return { ok: false } as never;
+        },
+      });
+      await invokeTool(bad, {}, ctx, session);
+      expect(session.activeTaskId).toBeNull();
+    });
+
+    it("forTask attributes the call without changing the active task", async () => {
+      await invokeTool(starter("t1"), {}, ctx, session);
+      await invokeTool(forTaskTool, {}, ctx, session);
+      await invokeTool(analyzeAudio, { path: "song.wav" }, ctx, session);
+      expect(session.activeTaskId).toBe("t1");
+      expect(storage.traces.map((t) => t.taskId)).toEqual(["t1", "other", "t1"]);
+    });
+  });
 });

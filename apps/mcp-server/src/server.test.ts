@@ -4,7 +4,7 @@ import path from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { ReaperDaw } from "@reaper-copilot/adapter-reaper";
-import { AudioFeaturesSchema, CopilotError, JobStatusSchema, type DawPort } from "@reaper-copilot/core";
+import { AudioFeaturesSchema, CopilotError, JobStatusSchema, VerifyTaskOutputSchema, type DawPort } from "@reaper-copilot/core";
 import { FakeAnalyzer, FakeDaw, FakeStorage, SAMPLE_AUDIO_FEATURES } from "@reaper-copilot/testing";
 import {
   ALL_TOOLS,
@@ -92,7 +92,7 @@ const textOf = (result: object): string => {
 };
 
 describe("MCP server", () => {
-  const READ_TOOLS = ["get_project_state", "list_presets", "get_job_status", "analyze_audio", "compare_audio"];
+  const READ_TOOLS = ["get_project_state", "list_presets", "get_job_status", "analyze_audio", "compare_audio", "start_task", "verify_task"];
   const WRITE_TOOLS = [
     "import_audio",
     "set_tempo",
@@ -103,7 +103,7 @@ describe("MCP server", () => {
     "undo_last",
   ];
 
-  it("lists only the 5 read tools in mentor mode, all read-only", async () => {
+  it("lists only the 7 read tools in mentor mode, all read-only", async () => {
     const { client, close } = await connect({ mode: "mentor" });
     const { tools } = await client.listTools();
     expect(tools.map((tool) => tool.name).sort()).toEqual([...READ_TOOLS].sort());
@@ -114,7 +114,7 @@ describe("MCP server", () => {
     await close();
   });
 
-  it("lists the 12 tools in agent mode, with readOnlyHint matching the risk", async () => {
+  it("lists the 14 tools in agent mode, with readOnlyHint matching the risk", async () => {
     const { client, close } = await connect({ mode: "agent" });
     const { tools } = await client.listTools();
     expect(tools.map((tool) => tool.name).sort()).toEqual([...READ_TOOLS, ...WRITE_TOOLS].sort());
@@ -123,6 +123,22 @@ describe("MCP server", () => {
       // get_job_status returns a discriminated union: not an object schema, so MCP advertises none.
       expect(tool.outputSchema !== undefined || tool.name === "get_job_status").toBe(true);
     }
+    await close();
+  });
+
+  it("announces an object inputSchema and an outputSchema for the task tools", async () => {
+    const { client, close } = await connect({ mode: "mentor" });
+    const { tools } = await client.listTools();
+    for (const name of ["start_task", "verify_task"]) {
+      const tool = tools.find((candidate) => candidate.name === name);
+      expect(tool?.outputSchema, name).toBeDefined();
+      expect(tool?.inputSchema.type, name).toBe("object");
+    }
+    const start = tools.find((candidate) => candidate.name === "start_task");
+    expect(Object.keys(start?.inputSchema.properties ?? {}).sort()).toEqual(
+      ["criteria", "request", "source", "target"],
+    );
+    expect(start?.inputSchema.required).toEqual(expect.arrayContaining(["request", "source"]));
     await close();
   });
 
@@ -292,5 +308,92 @@ describe("MCP server", () => {
     const tool = tools.find((candidate) => candidate.name === "test_write");
     expect(tool?.annotations?.readOnlyHint).toBe(false);
     await close();
+  });
+
+  describe("tasks", () => {
+    const withTaskFiles = async () => {
+      await writeFile(path.join(ws, "source.wav"), "s");
+      await writeFile(path.join(ws, "render.wav"), "r");
+      return new FakeAnalyzer({
+        resultFor: (assetPath) =>
+          path.basename(assetPath) === "render.wav"
+            ? {
+                ...SAMPLE_AUDIO_FEATURES,
+                file: { ...SAMPLE_AUDIO_FEATURES.file, sha256: "b".repeat(64), durationSec: 5.647 },
+                tempo: { ...SAMPLE_AUDIO_FEATURES.tempo, bpm: 170 },
+                dynamics: { crestFactorDb: SAMPLE_AUDIO_FEATURES.dynamics.crestFactorDb - 3 },
+              }
+            : SAMPLE_AUDIO_FEATURES,
+      });
+    };
+
+    it("verifies a task end to end in mentor mode and attributes traces to it", async () => {
+      const analyzer = await withTaskFiles();
+      const { client, storage, close } = await connect({ mode: "mentor", analyzer });
+      await client.callTool({ name: "analyze_audio", arguments: { path: "source.wav" } });
+      const started = await client.callTool({
+        name: "start_task",
+        arguments: {
+          request: "loop of 4 bars at 170 bpm, less peaky",
+          source: "source.wav",
+          target: { bpm: 170, bars: 4 },
+          criteria: [
+            { id: "crest", metric: "dynamics.crestFactorDb", basis: "delta", max: -1 },
+          ],
+        },
+      });
+      expect(started.isError, textOf(started)).toBeFalsy();
+      const { taskId } = started.structuredContent as { taskId: string };
+      const verified = await client.callTool({
+        name: "verify_task",
+        arguments: { taskId, path: "render.wav" },
+      });
+      expect(verified.isError, textOf(verified)).toBeFalsy();
+      const output = VerifyTaskOutputSchema.parse(verified.structuredContent);
+      expect(output).toMatchObject({ taskId, attempt: 1, pass: true });
+      expect(output.results.map((r) => [r.id, r.status])).toEqual([
+        ["duration", "pass"],
+        ["tempo", "pass"],
+        ["crest", "pass"],
+      ]);
+      expect(storage.traces.map((t) => [t.tool, t.taskId])).toEqual([
+        ["analyze_audio", null],
+        ["start_task", taskId],
+        ["verify_task", taskId],
+      ]);
+      await close();
+    });
+
+    it("rejects a delta criterion whose interval includes 0, naming the rule", async () => {
+      await writeFile(path.join(ws, "source.wav"), "s");
+      const { client, close } = await connect({ mode: "mentor" });
+      const outcome = await client
+        .callTool({
+          name: "start_task",
+          arguments: {
+            request: "r",
+            source: "source.wav",
+            criteria: [{ id: "c", metric: "dynamics.crestFactorDb", basis: "delta", min: -1, max: 1 }],
+          },
+        })
+        .then((result) => ({ isError: result.isError === true, text: textOf(result) }))
+        .catch((error: unknown) => ({ isError: true, text: String(error) }));
+      expect(outcome.isError).toBe(true);
+      expect(outcome.text).toContain("cannot include 0");
+      await close();
+    });
+
+    it("rejects criteria passed to verify_task", async () => {
+      const { client, close } = await connect({ mode: "mentor" });
+      const outcome = await client
+        .callTool({
+          name: "verify_task",
+          arguments: { taskId: "11111111-1111-4111-8111-111111111111", path: "song.wav", criteria: [] },
+        })
+        .then((result) => ({ isError: result.isError === true }))
+        .catch(() => ({ isError: true }));
+      expect(outcome.isError).toBe(true);
+      await close();
+    });
   });
 });

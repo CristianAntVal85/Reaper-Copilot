@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   type AnalysisCacheKey,
   type StoragePort,
+  type Task,
   type ToolCallTrace,
+  type Verification,
 } from "@reaper-copilot/core";
 import { SAMPLE_AUDIO_FEATURES } from "./fake-analyzer.ts";
 
@@ -25,6 +27,54 @@ function trace(step: number, overrides: Partial<ToolCallTrace> = {}): ToolCallTr
     durationMs: 12.5,
     startedAt: "2026-01-01T00:00:00.000Z",
     cacheHits: 0,
+    taskId: null,
+    ...overrides,
+  };
+}
+
+const TASK_ID = "11111111-1111-4111-8111-111111111111";
+
+function task(overrides: Partial<Task> = {}): Task {
+  return {
+    taskId: TASK_ID,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    request: "make it 170 bpm",
+    source: "loop.wav",
+    target: { bpm: 170 },
+    criteria: [
+      { id: "tempo", derived: true, metric: "tempo.bpm", basis: "absolute", min: 169, max: 171 },
+    ],
+    ...overrides,
+  };
+}
+
+function withoutAttempt(v: Verification): Omit<Verification, "attempt"> {
+  const copy: Partial<Verification> = { ...v };
+  delete copy.attempt;
+  return copy as Omit<Verification, "attempt">;
+}
+
+function verification(attempt: number, overrides: Partial<Verification> = {}): Verification {
+  return {
+    taskId: TASK_ID,
+    attempt,
+    verifiedAt: "2026-01-01T00:01:00.000Z",
+    render: { path: "out/render.wav", sha256: "c".repeat(64) },
+    pass: true,
+    results: [
+      {
+        id: "tempo",
+        derived: true,
+        metric: "tempo.bpm",
+        basis: "absolute",
+        status: "pass",
+        measured: 170,
+        min: 169,
+        max: 171,
+        sourceValue: null,
+        renderValue: null,
+      },
+    ],
     ...overrides,
   };
 }
@@ -95,6 +145,70 @@ export function describeStorageBehaviour(name: string, create: () => Promise<Sto
       await expect(storage.recordToolCall(trace(1, { errorCode: "oops" }))).rejects.toThrow();
       await expect(storage.recordToolCall(trace(0))).rejects.toThrow();
       expect(await storage.listToolCalls()).toEqual([]);
+    });
+
+    it("round-trips a trace attributed to a task", async () => {
+      const storage = await create();
+      const attributed = trace(1, { taskId: TASK_ID });
+      await storage.recordToolCall(attributed);
+      expect(await storage.listToolCalls()).toEqual([attributed]);
+    });
+
+    it("creates and reads a task; an unknown one is null", async () => {
+      const storage = await create();
+      expect(await storage.getTask(TASK_ID)).toBeNull();
+      await storage.createTask(task());
+      expect(await storage.getTask(TASK_ID)).toEqual(task());
+      expect(await storage.getTask("22222222-2222-4222-8222-222222222222")).toBeNull();
+    });
+
+    it("rejects a repeated taskId and keeps the first task", async () => {
+      const storage = await create();
+      await storage.createTask(task());
+      await expect(storage.createTask(task({ request: "other" }))).rejects.toThrow();
+      expect(await storage.getTask(TASK_ID)).toEqual(task());
+    });
+
+    it("rejects a task outside the schema without storing it", async () => {
+      const storage = await create();
+      await expect(storage.createTask(task({ criteria: [] }))).rejects.toThrow();
+      await expect(storage.createTask(task({ taskId: "not-a-uuid" }))).rejects.toThrow();
+      expect(await storage.getTask(TASK_ID)).toBeNull();
+    });
+
+    it("assigns attempts per task, in order, and lists them ascending", async () => {
+      const storage = await create();
+      const other = "22222222-2222-4222-8222-222222222222";
+      const fresh = withoutAttempt(verification(1));
+      expect(await storage.recordVerification(fresh)).toEqual(verification(1));
+      expect(await storage.recordVerification({ ...fresh, pass: false })).toEqual(
+        verification(2, { pass: false }),
+      );
+      expect((await storage.recordVerification({ ...fresh, taskId: other })).attempt).toBe(1);
+      expect(await storage.listVerifications(TASK_ID)).toEqual([
+        verification(1),
+        verification(2, { pass: false }),
+      ]);
+      expect(await storage.listVerifications("33333333-3333-4333-8333-333333333333")).toEqual([]);
+    });
+
+    it("gives two concurrent verifications different attempts", async () => {
+      const storage = await create();
+      const fresh = withoutAttempt(verification(1));
+      const both = await Promise.all([
+        storage.recordVerification(fresh),
+        storage.recordVerification(fresh),
+      ]);
+      expect(both.map((v) => v.attempt).sort()).toEqual([1, 2]);
+    });
+
+    it("rejects a verification outside the schema without storing it", async () => {
+      const storage = await create();
+      const fresh = withoutAttempt(verification(1));
+      await expect(
+        storage.recordVerification({ ...fresh, render: { path: "", sha256: "x" } }),
+      ).rejects.toThrow();
+      expect(await storage.listVerifications(TASK_ID)).toEqual([]);
     });
   });
 }

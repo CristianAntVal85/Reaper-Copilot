@@ -13,6 +13,7 @@ import type {
   TrackRef,
 } from "./daw.ts";
 import type { AudioFeatures } from "./audio-features.ts";
+import type { Task, Verification } from "./task.ts";
 import type { AnalysisCacheKey, ToolCallTrace } from "./storage.ts";
 
 export interface AnalyzeOptions {
@@ -29,6 +30,16 @@ export interface StoragePort {
   recordToolCall(trace: ToolCallTrace): Promise<void>;
   /** Most recent first. */
   listToolCalls(options?: { limit?: number }): Promise<ToolCallTrace[]>;
+  /** Rejects a task that fails `TaskSchema` or whose `taskId` already exists. */
+  createTask(task: Task): Promise<void>;
+  getTask(taskId: string): Promise<Task | null>;
+  /**
+   * Rejects a verification that fails `VerificationSchema` (without `attempt`). The storage assigns
+   * `attempt = MAX(attempt) + 1` for the task, atomically, and returns the stored verification.
+   */
+  recordVerification(verification: Omit<Verification, "attempt">): Promise<Verification>;
+  /** Ascending `attempt`. */
+  listVerifications(taskId: string): Promise<Verification[]>;
 }
 
 export interface DawPort {

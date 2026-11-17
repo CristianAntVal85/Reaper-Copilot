@@ -17,6 +17,7 @@ const okTrace = {
   durationMs: 12.5,
   startedAt: "2026-11-16T10:00:00.000Z",
   cacheHits: 0,
+  taskId: null,
 };
 
 const failedTrace = { ...okTrace, ok: false, result: null, errorCode: "file_not_found" };
@@ -34,6 +35,7 @@ describe("AnalysisCacheKeySchema", () => {
     ["zero target", { ...key, targetBpm: 0 }],
     ["missing target", { sha256: key.sha256, revision: key.revision }],
     ["empty revision", { ...key, revision: "" }],
+    ["empty taskId", { ...okTrace, taskId: "" }],
     ["extra field", { ...key, extra: 1 }],
   ])("rejects %s", (_name, value) => {
     expect(AnalysisCacheKeySchema.safeParse(value).success).toBe(false);
@@ -72,6 +74,10 @@ describe("StoragePort", () => {
       putCachedAnalysis: () => Promise.resolve(),
       recordToolCall: () => Promise.resolve(),
       listToolCalls: () => Promise.resolve([]),
+      createTask: () => Promise.resolve(),
+      getTask: () => Promise.resolve(null),
+      recordVerification: (v) => Promise.resolve({ ...v, attempt: 1 }),
+      listVerifications: () => Promise.resolve([]),
     };
     expect(typeof port.listToolCalls).toBe("function");
   });

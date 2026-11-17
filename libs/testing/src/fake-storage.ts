@@ -1,10 +1,14 @@
 import {
   AudioFeaturesSchema,
+  TaskSchema,
   ToolCallTraceSchema,
+  VerificationSchema,
   type AnalysisCacheKey,
   type AudioFeatures,
   type StoragePort,
+  type Task,
   type ToolCallTrace,
+  type Verification,
 } from "@reaper-copilot/core";
 
 export type StorageCall =
@@ -15,7 +19,11 @@ export type StorageCall =
       readonly features: AudioFeatures;
     }
   | { readonly method: "recordToolCall"; readonly trace: ToolCallTrace }
-  | { readonly method: "listToolCalls"; readonly options: { limit?: number } | undefined };
+  | { readonly method: "listToolCalls"; readonly options: { limit?: number } | undefined }
+  | { readonly method: "createTask"; readonly task: Task }
+  | { readonly method: "getTask"; readonly taskId: string }
+  | { readonly method: "recordVerification"; readonly verification: Omit<Verification, "attempt"> }
+  | { readonly method: "listVerifications"; readonly taskId: string };
 
 /** Per-method failures. A set error makes that method reject (after the call is logged). */
 export interface StorageErrors {
@@ -23,6 +31,10 @@ export interface StorageErrors {
   put?: Error | undefined;
   record?: Error | undefined;
   list?: Error | undefined;
+  createTask?: Error | undefined;
+  getTask?: Error | undefined;
+  recordVerification?: Error | undefined;
+  listVerifications?: Error | undefined;
 }
 
 /**
@@ -35,6 +47,8 @@ export class FakeStorage implements StoragePort {
   readonly calls: StorageCall[] = [];
   readonly #cache = new Map<string, AudioFeatures>();
   readonly #traces: ToolCallTrace[] = [];
+  readonly #tasks = new Map<string, Task>();
+  readonly #verifications: Verification[] = [];
 
   constructor(init: { errors?: StorageErrors } = {}) {
     this.errors = init.errors ?? {};
@@ -43,6 +57,16 @@ export class FakeStorage implements StoragePort {
   /** Recorded traces, oldest first (the order `recordToolCall` was called). */
   get traces(): readonly ToolCallTrace[] {
     return this.#traces;
+  }
+
+  /** Stored tasks, in creation order. */
+  get tasks(): readonly Task[] {
+    return [...this.#tasks.values()];
+  }
+
+  /** Stored verifications, in the order they were recorded. */
+  get verifications(): readonly Verification[] {
+    return this.#verifications;
   }
 
   async getCachedAnalysis(key: AnalysisCacheKey): Promise<AudioFeatures | null> {
@@ -73,6 +97,39 @@ export class FakeStorage implements StoragePort {
     }
     const newestFirst = [...this.#traces].reverse();
     return copy(limit === undefined ? newestFirst : newestFirst.slice(0, limit));
+  }
+
+  async createTask(task: Task): Promise<void> {
+    this.calls.push({ method: "createTask", task });
+    if (this.errors.createTask) throw this.errors.createTask;
+    const valid = TaskSchema.parse(copy(task));
+    if (this.#tasks.has(valid.taskId)) throw new Error(`task ${valid.taskId} already exists`);
+    this.#tasks.set(valid.taskId, valid);
+  }
+
+  async getTask(taskId: string): Promise<Task | null> {
+    this.calls.push({ method: "getTask", taskId });
+    if (this.errors.getTask) throw this.errors.getTask;
+    const task = this.#tasks.get(taskId);
+    return task ? copy(task) : null;
+  }
+
+  async recordVerification(verification: Omit<Verification, "attempt">): Promise<Verification> {
+    this.calls.push({ method: "recordVerification", verification });
+    if (this.errors.recordVerification) throw this.errors.recordVerification;
+    const attempt =
+      this.#verifications.reduce((max, v) => (v.taskId === verification.taskId ? Math.max(max, v.attempt) : max), 0) + 1;
+    const valid = VerificationSchema.parse({ ...copy(verification), attempt });
+    this.#verifications.push(valid);
+    return copy(valid);
+  }
+
+  async listVerifications(taskId: string): Promise<Verification[]> {
+    this.calls.push({ method: "listVerifications", taskId });
+    if (this.errors.listVerifications) throw this.errors.listVerifications;
+    return copy(
+      this.#verifications.filter((v) => v.taskId === taskId).sort((a, b) => a.attempt - b.attempt),
+    );
   }
 }
 
