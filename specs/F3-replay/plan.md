@@ -238,3 +238,24 @@ Criterio de salida: URL pública con al menos tres ejecuciones reales.
 3. Exporta cada una con `pnpm replay:export <taskId> --title "<English title>"` y revisa la salida (rutas y tamaños) antes del commit.
 4. `pnpm --filter web start` (o el comando que quede en `CLAUDE.md`) abre la web en local. Hay que ver la lista de tres ejecuciones y, en cada una, la petición, los pasos, los criterios por intento, los dos reproductores, la forma de onda con la marca de reproducción y el espectro superpuesto.
 5. Commit de las ejecuciones, pull request a `main` y fusión. El autor activa Pages (Settings → Pages → Source: GitHub Actions). El workflow despliega y `https://cristianantval85.github.io/Reaper-Copilot/` muestra las tres ejecuciones con el audio reproduciéndose.
+
+## 7. Correcciones de la validación
+
+Primera vuelta de validación; todo corregido en `fix(web): route input binding, player and mobile fixes, exporter hardening`.
+
+| # | Hallazgo | Decidido |
+|---|---|---|
+| 1 | `RunPage.taskId` nunca se rellenaba (sin `withComponentInputBinding()`), todas las ejecuciones fallaban | `withComponentInputBinding()` en `app.config.ts`; prueba con `RouterTestingHarness` y la configuración real; el `catch` hace `console.error` y sigue mostrando el mensaje |
+| 2 | `*.mp3` ignoraba los MP3 exportados | negación `!apps/web/public/runs/**/*.mp3` (comprobada con `git check-ignore`); línea en `CLAUDE.md` sobre audio propio (constitución 16) |
+| 3 | Reproductores | al reproducir uno se pausa el otro; al cambiar de intento «After» se pausa y vuelve a 0 |
+| 4 | Espectro ilegible en móvil | texto de ejes y títulos («Frequency (Hz, logarithmic)», «Level (dB, relative to full scale)») en HTML a 12 px; marcas en 20 Hz y 20 kHz; en móvil se oculta la marca de 10k para que no choque con 20k |
+| 5 | Contexto del visitante | párrafo, enlace al repositorio, `<meta name="description">` y leyenda bajo la tabla |
+| 6 | Petición en otro idioma | **Decisión del usuario (b):** se muestra en su idioma original, con la etiqueta «Original request», bajo el título en inglés; no se traduce ni se pide en inglés; sin `lang` |
+| 7 | Móvil | tabla en contenedor con scroll, región etiquetada y enfocable; `summary` con `flex-wrap`; fila de lista en columna; fechas en UTC con formato fijo |
+| 8 | Forma de onda | parte reproducida con `clipPath` y tono más oscuro; `aria-orientation="horizontal"` |
+| 9 | Exportador | `taskId` validado como uuid; fallo sin escribir si queda una ruta de host tras `scrubPaths`; el índice se regenera antes de borrar `.old` y, si falla, se restaura la carpeta anterior |
+| 10 | Workflow | `contents: read` global; `pages: write` e `id-token: write` solo en `deploy` |
+| 11 | Formato fuera de alcance | revertido en `python-analyzer.ts` |
+| 12 | Presupuesto del bundle | aviso a 800 kB (el bundle inicial son unos 730 kB por zod de `core`), comentado en `angular.json` |
+
+Añadido sin pedirlo: `**/.angular/` en los ignores de ESLint (la caché de Angular rompía `lint` de `web`).

@@ -84,7 +84,7 @@ El producto se entrega en **tres bloques** sobre un mismo núcleo:
 - No es un vídeo: es una página interactiva alimentada por archivos JSON y de audio exportados desde las trazas reales (sección 9). Un vídeo corto en el README la complementa.
 - Sin backend, sin API, sin Reaper. Coste cero.
 - El indicador "demo en vivo disponible / no disponible" llega en la fase 4, con el servidor Live.
-- La interfaz va en inglés. El sitio es una aplicación Angular 22.2 sin librerías de gráficas ni de audio: la forma de onda y el espectro son SVG propio sobre datos precalculados.
+- La interfaz va en inglés, pero la petición original se muestra tal como la escribió el usuario (en su idioma), con la etiqueta «Original request», debajo del título en inglés. El sitio es una aplicación Angular 22.2 sin librerías de gráficas ni de audio: la forma de onda y el espectro son SVG propio sobre datos precalculados.
 - **Audio público:** solo material propio o con licencia que permita publicarlo. No usar fragmentos de canciones comerciales en la demo.
 
 ### 4.3 Bloque Live (portfolio, restringido)
