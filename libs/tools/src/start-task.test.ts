@@ -59,6 +59,23 @@ describe("start_task", () => {
     });
   });
 
+  it("stores an absolute source inside the workspace as relative", async () => {
+    const result = await invokeTool(startTask, { ...base, source: path.join(ws, "song.wav") }, ctx, session);
+    expect(result.ok).toBe(true);
+    expect(storage.tasks[0]?.source).toBe("song.wav");
+  });
+
+  it("refuses a task beyond the session cap with out_of_range and stores nothing more", async () => {
+    session = createToolSession("capped", { maxTasks: 2 });
+    for (let i = 0; i < 2; i += 1) {
+      expect((await invokeTool(startTask, base, ctx, session)).ok).toBe(true);
+    }
+    const result = await invokeTool(startTask, base, ctx, session);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.message).toContain("out_of_range");
+    expect(storage.tasks).toHaveLength(2);
+  });
+
   it("reports internal_error when saving fails", async () => {
     storage.errors.createTask = new Error("disk full");
     const result = await invokeTool(startTask, base, ctx, session);

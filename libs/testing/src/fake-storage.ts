@@ -22,7 +22,7 @@ export type StorageCall =
   | { readonly method: "listToolCalls"; readonly options: { limit?: number } | undefined }
   | { readonly method: "createTask"; readonly task: Task }
   | { readonly method: "getTask"; readonly taskId: string }
-  | { readonly method: "recordVerification"; readonly verification: Verification }
+  | { readonly method: "recordVerification"; readonly verification: Omit<Verification, "attempt"> }
   | { readonly method: "listVerifications"; readonly taskId: string };
 
 /** Per-method failures. A set error makes that method reject (after the call is logged). */
@@ -114,14 +114,14 @@ export class FakeStorage implements StoragePort {
     return task ? copy(task) : null;
   }
 
-  async recordVerification(verification: Verification): Promise<void> {
+  async recordVerification(verification: Omit<Verification, "attempt">): Promise<Verification> {
     this.calls.push({ method: "recordVerification", verification });
     if (this.errors.recordVerification) throw this.errors.recordVerification;
-    const valid = VerificationSchema.parse(copy(verification));
-    if (this.#verifications.some((v) => v.taskId === valid.taskId && v.attempt === valid.attempt)) {
-      throw new Error(`verification ${valid.taskId}#${valid.attempt} already exists`);
-    }
+    const attempt =
+      this.#verifications.reduce((max, v) => (v.taskId === verification.taskId ? Math.max(max, v.attempt) : max), 0) + 1;
+    const valid = VerificationSchema.parse({ ...copy(verification), attempt });
     this.#verifications.push(valid);
+    return copy(valid);
   }
 
   async listVerifications(taskId: string): Promise<Verification[]> {

@@ -1,7 +1,7 @@
 import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import type { AudioFeatures } from "@reaper-copilot/core";
+import { MAX_VERIFICATIONS_PER_TASK, type AudioFeatures } from "@reaper-copilot/core";
 import { FakeAnalyzer, FakeStorage, SAMPLE_AUDIO_FEATURES } from "@reaper-copilot/testing";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createToolSession, invokeTool, type ToolSession } from "./invoke-tool.ts";
@@ -94,11 +94,11 @@ describe("verify_task", () => {
   });
 
   it("reports task_not_found for an unknown taskId", async () => {
-    const result = await invokeTool(verifyTask, { taskId: "nope", path: "render1.wav" }, ctx, session);
+    const result = await invokeTool(verifyTask, { taskId: "99999999-9999-4999-8999-999999999999", path: "render1.wav" }, ctx, session);
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.message).toContain("task_not_found");
-      expect(result.message).not.toContain("nope");
+      expect(result.message).not.toContain("99999999");
     }
     expect(storage.verifications).toEqual([]);
   });
@@ -126,6 +126,44 @@ describe("verify_task", () => {
     const taskId = await start({ criteria: deltaCriteria });
     await invokeTool(verifyTask, { taskId, path: "render2.wav" }, ctx, session);
     expect(storage.traces.at(-1)).toMatchObject({ tool: "verify_task", taskId });
+  });
+
+  it("rejects a taskId that is not a uuid", async () => {
+    const result = await invokeTool(verifyTask, { taskId: "nope", path: "render1.wav" }, ctx, session);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.message).toContain("invalid_input");
+  });
+
+  it("returns and stores an absolute render path inside the workspace as relative", async () => {
+    const taskId = await start({ criteria: deltaCriteria });
+    const result = await invokeTool(
+      verifyTask,
+      { taskId, path: path.join(ws, "render2.wav") },
+      ctx,
+      session,
+    );
+    if (!result.ok) throw new Error(result.message);
+    expect(verifyTask.outputSchema.parse(result.output).render.path).toBe("render2.wav");
+    expect(storage.verifications[0]?.render.path).toBe("render2.wav");
+  });
+
+  it("refuses the 51st verification of a task before analyzing anything", async () => {
+    const taskId = await start({ criteria: deltaCriteria });
+    for (let i = 0; i < MAX_VERIFICATIONS_PER_TASK; i += 1) {
+      await storage.recordVerification({
+        taskId,
+        verifiedAt: "2026-01-01T00:00:00.000Z",
+        render: { path: "render1.wav", sha256: "2".repeat(64) },
+        pass: false,
+        results: [],
+      });
+    }
+    const before = analyzer.calls.length;
+    const result = await invokeTool(verifyTask, { taskId, path: "render1.wav" }, ctx, session);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.message).toContain("out_of_range");
+    expect(analyzer.calls.length).toBe(before);
+    expect(storage.verifications).toHaveLength(MAX_VERIFICATIONS_PER_TASK);
   });
 
   it("rejects a render outside the workspace", async () => {

@@ -76,7 +76,7 @@ describe("StoragePort", () => {
       listToolCalls: () => Promise.resolve([]),
       createTask: () => Promise.resolve(),
       getTask: () => Promise.resolve(null),
-      recordVerification: () => Promise.resolve(),
+      recordVerification: (v) => Promise.resolve({ ...v, attempt: 1 }),
       listVerifications: () => Promise.resolve([]),
     };
     expect(typeof port.listToolCalls).toBe("function");

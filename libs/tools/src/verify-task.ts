@@ -1,6 +1,12 @@
-import { CopilotError, evaluateCriteria, VerifyTaskOutputSchema } from "@reaper-copilot/core";
+import {
+  CopilotError,
+  evaluateCriteria,
+  MAX_VERIFICATIONS_PER_TASK,
+  VerifyTaskOutputSchema,
+} from "@reaper-copilot/core";
 import { z } from "zod";
 import { analyzeWithCache } from "./analyze-with-cache.ts";
+import { relativeToWorkspace } from "./render-paths.ts";
 import { resolveAssetPath } from "./resolve-asset-path.ts";
 import { defineTool } from "./tool-definition.ts";
 
@@ -15,7 +21,7 @@ export const verifyTask = defineTool({
     "To change the criteria, start a new task with start_task.",
   risk: "read",
   inputSchema: z.strictObject({
-    taskId: z.string().min(1),
+    taskId: z.uuid(),
     path: z.string().min(1),
   }),
   outputSchema: VerifyTaskOutputSchema,
@@ -24,6 +30,14 @@ export const verifyTask = defineTool({
     const task = await ctx.storage.getTask(input.taskId);
     if (task === null) throw new CopilotError("task_not_found", "no task with that taskId");
     ctx.trace?.forTask(task.taskId);
+    if ((await ctx.storage.listVerifications(task.taskId)).length >= MAX_VERIFICATIONS_PER_TASK) {
+      throw new CopilotError(
+        "out_of_range",
+        `this task already has the maximum of ${MAX_VERIFICATIONS_PER_TASK} verifications; start a new task`,
+      );
+    }
+    const renderRelative = await relativeToWorkspace(ctx.workspaceRoot, renderPath);
+    if (renderRelative === null) throw new CopilotError("path_outside_workspace", "invalid path");
 
     const targetBpm = task.target.bpm;
     const render = await analyzeWithCache(
@@ -39,15 +53,19 @@ export const verifyTask = defineTool({
     }
 
     const { pass, results } = evaluateCriteria(task.criteria, render.features, source);
-    const attempt = (await ctx.storage.listVerifications(task.taskId)).length + 1;
-    const output = {
+    const stored = await ctx.storage.recordVerification({
       taskId: task.taskId,
-      attempt,
-      render: { path: input.path, sha256: render.features.file.sha256 },
+      render: { path: renderRelative, sha256: render.features.file.sha256 },
       pass,
       results,
+      verifiedAt: new Date().toISOString(),
+    });
+    return {
+      taskId: stored.taskId,
+      attempt: stored.attempt,
+      render: stored.render,
+      pass: stored.pass,
+      results: stored.results,
     };
-    await ctx.storage.recordVerification({ ...output, verifiedAt: new Date().toISOString() });
-    return output;
   },
 });

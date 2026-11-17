@@ -48,6 +48,12 @@ function task(overrides: Partial<Task> = {}): Task {
   };
 }
 
+function withoutAttempt(v: Verification): Omit<Verification, "attempt"> {
+  const copy: Partial<Verification> = { ...v };
+  delete copy.attempt;
+  return copy as Omit<Verification, "attempt">;
+}
+
 function verification(attempt: number, overrides: Partial<Verification> = {}): Verification {
   return {
     taskId: TASK_ID,
@@ -170,12 +176,15 @@ export function describeStorageBehaviour(name: string, create: () => Promise<Sto
       expect(await storage.getTask(TASK_ID)).toBeNull();
     });
 
-    it("lists verifications by ascending attempt, per task", async () => {
+    it("assigns attempts per task, in order, and lists them ascending", async () => {
       const storage = await create();
       const other = "22222222-2222-4222-8222-222222222222";
-      await storage.recordVerification(verification(2, { pass: false }));
-      await storage.recordVerification(verification(1));
-      await storage.recordVerification(verification(1, { taskId: other }));
+      const fresh = withoutAttempt(verification(1));
+      expect(await storage.recordVerification(fresh)).toEqual(verification(1));
+      expect(await storage.recordVerification({ ...fresh, pass: false })).toEqual(
+        verification(2, { pass: false }),
+      );
+      expect((await storage.recordVerification({ ...fresh, taskId: other })).attempt).toBe(1);
       expect(await storage.listVerifications(TASK_ID)).toEqual([
         verification(1),
         verification(2, { pass: false }),
@@ -183,15 +192,23 @@ export function describeStorageBehaviour(name: string, create: () => Promise<Sto
       expect(await storage.listVerifications("33333333-3333-4333-8333-333333333333")).toEqual([]);
     });
 
-    it("rejects a repeated attempt and a verification outside the schema", async () => {
+    it("gives two concurrent verifications different attempts", async () => {
       const storage = await create();
-      await storage.recordVerification(verification(1));
-      await expect(storage.recordVerification(verification(1, { pass: false }))).rejects.toThrow();
-      await expect(storage.recordVerification(verification(0))).rejects.toThrow();
+      const fresh = withoutAttempt(verification(1));
+      const both = await Promise.all([
+        storage.recordVerification(fresh),
+        storage.recordVerification(fresh),
+      ]);
+      expect(both.map((v) => v.attempt).sort()).toEqual([1, 2]);
+    });
+
+    it("rejects a verification outside the schema without storing it", async () => {
+      const storage = await create();
+      const fresh = withoutAttempt(verification(1));
       await expect(
-        storage.recordVerification(verification(2, { render: { path: "", sha256: "x" } })),
+        storage.recordVerification({ ...fresh, render: { path: "", sha256: "x" } }),
       ).rejects.toThrow();
-      expect(await storage.listVerifications(TASK_ID)).toEqual([verification(1)]);
+      expect(await storage.listVerifications(TASK_ID)).toEqual([]);
     });
   });
 }

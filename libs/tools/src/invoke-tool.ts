@@ -1,4 +1,4 @@
-import { CopilotError, type ToolCallTrace } from "@reaper-copilot/core";
+import { CopilotError, MAX_TASKS_PER_SESSION, type ToolCallTrace } from "@reaper-copilot/core";
 import { z } from "zod";
 import type { AnyToolDefinition, ToolContext } from "./tool-definition.ts";
 
@@ -22,15 +22,27 @@ export interface ToolSession {
   readonly activeTaskId: string | null;
   nextStep(): number;
   setActiveTask(taskId: string | null): void;
+  /** Takes one of the session's task slots (`MAX_TASKS_PER_SESSION` by default); false if none is left. */
+  reserveTask(): boolean;
 }
 
-export function createToolSession(sessionId: string): ToolSession {
+export function createToolSession(
+  sessionId: string,
+  options: { maxTasks?: number } = {},
+): ToolSession {
+  const maxTasks = options.maxTasks ?? MAX_TASKS_PER_SESSION;
+  let reserved = 0;
   let step = 0;
   let activeTaskId: string | null = null;
   return {
     sessionId,
     get activeTaskId() {
       return activeTaskId;
+    },
+    reserveTask: () => {
+      if (reserved >= maxTasks) return false;
+      reserved += 1;
+      return true;
     },
     setActiveTask: (taskId) => {
       activeTaskId = taskId;
@@ -88,6 +100,7 @@ export async function invokeTool(
           forTask: (taskId: string) => {
             attributedTaskId = taskId;
           },
+          reserveTask: () => session.reserveTask(),
         },
       });
       const checked = tool.outputSchema.safeParse(output);

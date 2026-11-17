@@ -43,6 +43,7 @@ beforeEach(async () => {
       },
       taskStarted: () => {},
       forTask: () => {},
+      reserveTask: () => true,
     },
   };
 });

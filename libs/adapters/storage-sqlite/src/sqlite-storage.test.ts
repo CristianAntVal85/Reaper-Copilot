@@ -156,15 +156,45 @@ describe("SqliteStorage", () => {
     expect((await storage.listToolCalls()).map((t) => t.taskId)).toEqual(["t1", null]);
   });
 
-  it("leaves out a task or verification row that fails the schema", async () => {
+  it("throws for a stored task that fails the schema, and returns null for a missing one", async () => {
     const path = join(dir, "copilot.db");
     open(path).close();
     const raw = new DatabaseSync(path);
     raw.exec("INSERT INTO tasks VALUES ('bad', '2026-01-01T00:00:00Z', '{}')");
+    raw.exec("INSERT INTO tasks VALUES ('junk', '2026-01-01T00:00:00Z', 'not json')");
+    raw.close();
+    const storage = open(path);
+    await expect(storage.getTask("bad")).rejects.toThrow("invalid");
+    await expect(storage.getTask("junk")).rejects.toThrow("invalid");
+    expect(await storage.getTask("missing")).toBeNull();
+  });
+
+  it("assigns the next attempt over a corrupt verification row", async () => {
+    const path = join(dir, "copilot.db");
+    open(path).close();
+    const raw = new DatabaseSync(path);
+    const id = "11111111-1111-4111-8111-111111111111";
+    raw.exec(`INSERT INTO task_verifications VALUES ('${id}', 3, '2026-01-01T00:00:00Z', 'not json')`);
+    raw.close();
+    const storage = open(path);
+    const stored = await storage.recordVerification({
+      taskId: id,
+      verifiedAt: "2026-01-01T00:01:00.000Z",
+      render: { path: "out/render.wav", sha256: "c".repeat(64) },
+      pass: true,
+      results: [],
+    });
+    expect(stored.attempt).toBe(4);
+    expect((await storage.listVerifications(id)).map((v) => v.attempt)).toEqual([4]);
+  });
+
+  it("leaves out a verification row that fails the schema", async () => {
+    const path = join(dir, "copilot.db");
+    open(path).close();
+    const raw = new DatabaseSync(path);
     raw.exec("INSERT INTO task_verifications VALUES ('bad', 1, '2026-01-01T00:00:00Z', 'not json')");
     raw.close();
     const storage = open(path);
-    expect(await storage.getTask("bad")).toBeNull();
     expect(await storage.listVerifications("bad")).toEqual([]);
   });
 

@@ -33,8 +33,11 @@ export interface StoragePort {
   /** Rejects a task that fails `TaskSchema` or whose `taskId` already exists. */
   createTask(task: Task): Promise<void>;
   getTask(taskId: string): Promise<Task | null>;
-  /** Rejects a verification that fails `VerificationSchema` or repeats a `(taskId, attempt)`. */
-  recordVerification(verification: Verification): Promise<void>;
+  /**
+   * Rejects a verification that fails `VerificationSchema` (without `attempt`). The storage assigns
+   * `attempt = MAX(attempt) + 1` for the task, atomically, and returns the stored verification.
+   */
+  recordVerification(verification: Omit<Verification, "attempt">): Promise<Verification>;
   /** Ascending `attempt`. */
   listVerifications(taskId: string): Promise<Verification[]>;
 }

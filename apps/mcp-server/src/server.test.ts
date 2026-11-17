@@ -388,7 +388,7 @@ describe("MCP server", () => {
       const outcome = await client
         .callTool({
           name: "verify_task",
-          arguments: { taskId: "t", path: "song.wav", criteria: [] },
+          arguments: { taskId: "11111111-1111-4111-8111-111111111111", path: "song.wav", criteria: [] },
         })
         .then((result) => ({ isError: result.isError === true }))
         .catch(() => ({ isError: true }));

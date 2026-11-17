@@ -29,6 +29,8 @@ export interface CallTrace {
   taskStarted(taskId: string): void;
   /** Attributes this call to a task without changing the session's active task. */
   forTask(taskId: string): void;
+  /** Reserves a slot for a new task in the session; false when the session has reached its cap. */
+  reserveTask(): boolean;
 }
 
 export interface ToolDefinition<

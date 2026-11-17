@@ -1,12 +1,15 @@
 import { randomUUID } from "node:crypto";
 import {
   buildTaskCriteria,
+  CopilotError,
+  MAX_TASKS_PER_SESSION,
   resolveTarget,
   StartTaskInputSchema,
   TaskCriterionSchema,
   type Task,
 } from "@reaper-copilot/core";
 import { z } from "zod";
+import { relativeToWorkspace } from "./render-paths.ts";
 import { resolveAssetPath } from "./resolve-asset-path.ts";
 import { defineTool } from "./tool-definition.ts";
 
@@ -29,14 +32,22 @@ export const startTask = defineTool({
   }),
   handler: async (input, ctx) => {
     // Validate the path before storing anything (constitution, rule 13).
-    await resolveAssetPath(ctx.workspaceRoot, input.source);
+    const sourcePath = await resolveAssetPath(ctx.workspaceRoot, input.source);
+    const source = await relativeToWorkspace(ctx.workspaceRoot, sourcePath);
+    if (source === null) throw new CopilotError("path_outside_workspace", "invalid path");
+    if (ctx.trace?.reserveTask() === false) {
+      throw new CopilotError(
+        "out_of_range",
+        `this session already started the maximum of ${MAX_TASKS_PER_SESSION} tasks`,
+      );
+    }
     const taskId = randomUUID();
     const criteria = buildTaskCriteria(input.target, input.criteria);
     const task: Task = {
       taskId,
       createdAt: new Date().toISOString(),
       request: input.request,
-      source: input.source,
+      source,
       target: resolveTarget(input.target),
       criteria,
     };

@@ -10,6 +10,10 @@ export const DURATION_TOLERANCE_SEC = 0.02;
 export const TEMPO_TOLERANCE_BPM = 1;
 export const DEFAULT_BEATS_PER_BAR = 4;
 export const MAX_OWN_CRITERIA = 16;
+/** Verifications allowed per task. */
+export const MAX_VERIFICATIONS_PER_TASK = 50;
+/** Tasks a server session may start. */
+export const MAX_TASKS_PER_SESSION = 100;
 export const RESERVED_CRITERION_IDS = ["duration", "tempo"] as const;
 export const CRITERION_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,39}$/;
 
@@ -231,6 +235,9 @@ export const VerificationSchema = VerifyTaskOutputSchema.extend({
 });
 
 export type Verification = z.infer<typeof VerificationSchema>;
+
+/** A verification before the storage assigns its `attempt`. */
+export type NewVerification = Omit<Verification, "attempt">;
 
 export interface EvaluationResult {
   pass: boolean;

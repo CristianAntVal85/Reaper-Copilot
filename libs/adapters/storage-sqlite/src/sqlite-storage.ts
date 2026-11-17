@@ -119,7 +119,9 @@ export class SqliteStorage implements StoragePort {
       this.#getTask = this.#db.prepare("SELECT task_json FROM tasks WHERE task_id = ?");
       this.#insertVerification = this.#db.prepare(
         `INSERT INTO task_verifications (task_id, attempt, verified_at, verification_json)
-         VALUES (?, ?, ?, ?)`,
+         SELECT ?1, next.attempt, ?2, json_set(?3, '$.attempt', next.attempt)
+         FROM (SELECT COALESCE(MAX(attempt), 0) + 1 AS attempt FROM task_verifications WHERE task_id = ?1) AS next
+         RETURNING attempt`,
       );
       this.#listVerifications = this.#db.prepare(
         "SELECT verification_json FROM task_verifications WHERE task_id = ? ORDER BY attempt ASC",
@@ -179,15 +181,20 @@ export class SqliteStorage implements StoragePort {
     if (row === undefined) return null;
     try {
       const parsed = TaskSchema.safeParse(JSON.parse(String(row["task_json"])));
-      return parsed.success ? parsed.data : null;
+      if (parsed.success) return parsed.data;
     } catch {
-      return null;
+      // falls through to the error below
     }
+    // The task exists but cannot be read: that is a defect, not a missing task.
+    throw new Error(`stored task ${taskId} is invalid`);
   }
 
-  async recordVerification(verification: Verification): Promise<void> {
-    const v = VerificationSchema.parse(verification);
-    this.#insertVerification.run(v.taskId, v.attempt, v.verifiedAt, JSON.stringify(v));
+  async recordVerification(verification: Omit<Verification, "attempt">): Promise<Verification> {
+    // Validated with a placeholder attempt; the INSERT assigns the real one from the raw rows.
+    const v = VerificationSchema.parse({ ...verification, attempt: 1 });
+    const row = this.#insertVerification.get(v.taskId, v.verifiedAt, JSON.stringify(v));
+    if (row === undefined) throw new Error("verification was not stored");
+    return VerificationSchema.parse({ ...v, attempt: Number(row["attempt"]) });
   }
 
   async listVerifications(taskId: string): Promise<Verification[]> {
