@@ -13,16 +13,28 @@ export type InvokeResult =
   | { readonly ok: true; readonly output: unknown }
   | { readonly ok: false; readonly message: string };
 
-/** Numbers the calls of one server run: `step` starts at 1 and grows by one per call. */
+/**
+ * Numbers the calls of one server run (`step` starts at 1 and grows by one per call) and holds the
+ * active task, which later calls are attributed to unless they name another one.
+ */
 export interface ToolSession {
   readonly sessionId: string;
+  readonly activeTaskId: string | null;
   nextStep(): number;
+  setActiveTask(taskId: string | null): void;
 }
 
 export function createToolSession(sessionId: string): ToolSession {
   let step = 0;
+  let activeTaskId: string | null = null;
   return {
     sessionId,
+    get activeTaskId() {
+      return activeTaskId;
+    },
+    setActiveTask: (taskId) => {
+      activeTaskId = taskId;
+    },
     nextStep: () => {
       step += 1;
       return step;
@@ -51,6 +63,9 @@ export async function invokeTool(
   const startedAt = new Date().toISOString();
   const started = performance.now();
   let cacheHits = 0;
+  // Read at the start so a call never attributes itself to a task it opens.
+  let attributedTaskId: string | null = session.activeTaskId;
+  let startedTaskId: string | null = null;
   const log = ctx.log;
 
   const run = async (): Promise<{ output: unknown } | { code: string; message: string }> => {
@@ -66,6 +81,13 @@ export async function invokeTool(
           cacheHit: () => {
             cacheHits += 1;
           },
+          taskStarted: (taskId: string) => {
+            attributedTaskId = taskId;
+            startedTaskId = taskId;
+          },
+          forTask: (taskId: string) => {
+            attributedTaskId = taskId;
+          },
         },
       });
       const checked = tool.outputSchema.safeParse(output);
@@ -73,6 +95,7 @@ export async function invokeTool(
         log(`tool ${tool.name} produced output that does not match its schema: ${checked.error.message}`);
         return { code: INTERNAL_ERROR_CODE, message: `${INTERNAL_ERROR_CODE}: the tool failed unexpectedly` };
       }
+      if (startedTaskId !== null) session.setActiveTask(startedTaskId);
       return { output: checked.data };
     } catch (error) {
       if (error instanceof CopilotError) {
@@ -96,7 +119,7 @@ export async function invokeTool(
     durationMs: performance.now() - started,
     startedAt,
     cacheHits,
-    taskId: null,
+    taskId: attributedTaskId,
   };
   const trace: ToolCallTrace =
     "output" in outcome

@@ -25,6 +25,10 @@ export interface ToolContext {
 /** Counters a handler may bump while it runs; scoped to a single tool call. */
 export interface CallTrace {
   cacheHit(): void;
+  /** Attributes this call to a task just created and, only if the call succeeds, makes it the session's active task. */
+  taskStarted(taskId: string): void;
+  /** Attributes this call to a task without changing the session's active task. */
+  forTask(taskId: string): void;
 }
 
 export interface ToolDefinition<
