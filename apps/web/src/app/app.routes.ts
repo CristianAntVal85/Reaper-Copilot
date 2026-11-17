@@ -1,9 +1,9 @@
 import type { Routes } from "@angular/router";
 import { RunListPage } from "./run-list-page";
-import { RunPagePlaceholder } from "./run-page-placeholder";
+import { RunPage } from "./run-page";
 
 export const routes: Routes = [
   { path: "", component: RunListPage },
-  { path: "runs/:taskId", component: RunPagePlaceholder },
+  { path: "runs/:taskId", component: RunPage },
   { path: "**", redirectTo: "" },
 ];

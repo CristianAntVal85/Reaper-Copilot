@@ -205,7 +205,7 @@ Riesgos:
     - `pnpm check` y `pnpm check:full` incluyen `apps/web` y salen en verde.
     - `pnpm nx run web:build` (o el nombre que tenga el proyecto) genera el sitio.
     - Hay pruebas de la lista con un índice de ejemplo y con uno inválido, que muestra el mensaje de error.
-- [ ] **T5. Página de ejecución: cabecera, criterios y pasos.**
+- [x] **T5. Página de ejecución: cabecera, criterios y pasos.**
   - Cambios: la ruta `/runs/:taskId`, con la cabecera, la tabla de criterios por intento (con el intento elegible) y la línea temporal de pasos con `args` y `result` desplegables.
   - Hecho cuando: con un `run.json` de ejemplo de dos intentos (`fail` y `pass`), las pruebas muestran los dos intentos y los valores de `measured`, y un texto con `<script>` en `request` o en `args` sale como texto literal. Un `run.json` inválido muestra el mensaje de error.
 - [ ] **T6. Panel de audio: reproductores, forma de onda y espectro.**
