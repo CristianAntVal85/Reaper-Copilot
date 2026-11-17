@@ -195,7 +195,7 @@ Riesgos:
     - repetir la exportación sustituye la carpeta;
     - no hay rutas absolutas en `run.json`.
   - Para poder probarla, la lógica va en una función con los puertos y las rutas inyectados, y el script solo la cablea.
-- [ ] **T4. Andamiaje de `apps/web`.**
+- [x] **T4. Andamiaje de `apps/web`.**
   - Cambios:
     - Las dependencias aprobadas y `angular.json`.
     - La aplicación zoneless con router hash y la página `/` con la lista, leyendo `runs/index.json` con `RunsService`, que valida con `ReplayIndexSchema`.

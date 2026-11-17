@@ -28,3 +28,6 @@ spikes/**/out/
 # Audio de prueba con derechos de terceros
 .mp3/
 *.mp3
+
+# Angular (apps/web)
+.angular/

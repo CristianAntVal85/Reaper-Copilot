@@ -1,0 +1,33 @@
+:root {
+  color-scheme: light;
+  --bg: #f7f7f5;
+  --fg: #1c1c1e;
+  --muted: #55555c;
+  --line: #d4d4d0;
+  --accent: #0b5cad;
+  --pass: #0f6b2f;
+  --fail: #a4262c;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+a { color: var(--accent); }
+.site-header { border-bottom: 1px solid var(--line); padding: 0.75rem 1.5rem; background: #fff; }
+.brand { font-weight: 600; color: var(--fg); text-decoration: none; }
+.site-main { max-width: 56rem; margin: 0 auto; padding: 1.5rem; }
+h1 { font-size: 1.5rem; margin: 0 0 1rem; }
+.run-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); background: #fff; }
+.run-list li + li { border-top: 1px solid var(--line); }
+.run-row { display: grid; grid-template-columns: 1fr auto auto auto; gap: 1rem; align-items: center; padding: 0.75rem 1rem; text-decoration: none; color: inherit; }
+.run-row:hover, .run-row:focus-visible { background: #eef3f9; }
+.run-title { font-weight: 600; color: var(--accent); }
+.run-meta { color: var(--muted); font-size: 0.9rem; }
+.badge { font-weight: 700; font-size: 0.85rem; text-transform: uppercase; }
+.badge.pass { color: var(--pass); }
+.badge.fail { color: var(--fail); }
+.message { color: var(--muted); }
+.message.error { color: var(--fail); }
