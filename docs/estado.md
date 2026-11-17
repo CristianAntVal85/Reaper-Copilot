@@ -2,7 +2,7 @@
 
 Memoria entre sesiones. **Máximo 30 líneas, una idea por línea.** Lo que ya no sirva para decidir el siguiente paso se mueve a `docs/CHANGELOG.md`. Sin recuentos de pruebas: se obtienen ejecutando `pnpm check:full`.
 
-Última actualización: 2026-11-16
+Última actualización: 2026-11-17
 
 ## Dónde estamos
 - Fase 2 partida en F2a (Reaper desde MCP) y F2b (tareas y verificación). F2a implementada y validada en `fase/F2a-reaper`: `reviewer` y `reviewer-security` (2 vueltas) APROBADO; los 2 medios de seguridad corregidos. Commits de T4 en adelante sin push.
@@ -11,7 +11,7 @@ Memoria entre sesiones. **Máximo 30 líneas, una idea por línea.** Lo que ya n
 - Caché y almacenamiento: no guardar si el sha256 de Python difiere de la clave; validar la clave en `SqliteStorage` (objetivo 0 chocaría con «sin objetivo»); `hashFile` da `file_not_found` también con EACCES o EISDIR; `mcp:traces` abre la base en escritura; suite de almacenamiento duplicada.
 
 ## Siguiente paso
-- Usuario: demostración de F2a, pasos 3 a 7 de la sección 6 del plan. Antes: `claude mcp add --scope local reaper-copilot -e MODE=agent -- node apps/mcp-server/src/main.ts`, sesión nueva, `/mcp` debe mostrar 12 herramientas; revisar en Reaper File → Render (la prueba dejó `probe-dir`) o cerrar el proyecto sin guardar. Después: push, pull request a `main` con CI verde, cierre en `CHANGELOG.md`, y `/sdd-plan F2b-tareas`.
+- Usuario: demostración de F2a. Pasos 3, 4, 5 y 7 hechos (render 5,647 s correcto). Falta: en una sesión nueva de `agent`, comprobar que `get_job_status` llega a `done` sin error (arreglado el fallo `_zod` del SDK con esquemas de salida que no son objeto) y el paso 6 con un tema de `workspace/demo/` y su `offsetSec` a mano. Después: push, pull request a `main` con CI verde, cierre en `CHANGELOG.md`, y `/sdd-plan F2b-tareas`.
 
 ## Hecho
 - Fases 0, F0b, F1a y F1b cerradas; diseño en `docs/reaper-copilot.md` v2.9. Detalle en `docs/CHANGELOG.md`.

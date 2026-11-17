@@ -8,6 +8,7 @@ import {
   type ToolRegistry,
   type ToolSession,
 } from "@reaper-copilot/tools";
+import { z } from "zod";
 
 export interface CreateServerOptions {
   readonly registry: ToolRegistry;
@@ -48,7 +49,9 @@ export function createServer(options: CreateServerOptions): McpServer {
         description: tool.description,
         // The SDK validates input against this schema before the callback runs.
         inputSchema: tool.inputSchema as never,
-        outputSchema: tool.outputSchema as never,
+        // The SDK only handles object output schemas: given a union (get_job_status) it advertises none
+        // but still revalidates the result and crashes. `invokeTool` already validates every output.
+        outputSchema: (tool.outputSchema instanceof z.ZodObject ? tool.outputSchema : undefined) as never,
         annotations: { readOnlyHint: tool.risk === "read" },
       },
       (async (input: unknown) => runTool(tool, input, context, session)) as never,
