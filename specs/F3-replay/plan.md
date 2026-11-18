@@ -351,7 +351,7 @@ No entra: revisar los rangos de los presets (pregunta abierta 7) ni otros plugin
     - **La prueba del sonido pasa:** genera en el workspace un WAV de 4 s con un seno de 40 Hz y otro de 1 kHz (−12 dBFS cada uno), lo importa, le aplica la cadena de `eq_lowcut` resuelta del preset, lo renderiza y lo mide con `PythonAnalyzer`. La banda `sub` del render debe bajar al menos 6 dB respecto al original, y `mid` no debe cambiar más de 1 dB.
     - **La clave prohibida se rechaza:** una clave no permitida da `fx_not_allowed` sin dejar FX en la pista.
     - **Verificación:** `pnpm check` en verde, y `pnpm test:reaper` en verde en local.
-- [ ] **T11. Documentación y repetición de la tarea 3.**
+- [x] **T11. Documentación y repetición de la tarea 3.**
   - Cambios:
     - Documento maestro v2.12 en las secciones indicadas.
     - `CHANGELOG.md` y `docs/estado.md`, dentro de sus 30 líneas.
