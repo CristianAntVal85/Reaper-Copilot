@@ -261,3 +261,100 @@ Primera vuelta de validación; todo corregido en `fix(web): route input binding,
 Añadido sin pedirlo: `**/.angular/` en los ignores de ESLint (la caché de Angular rompía `lint` de `web`).
 
 Segunda vuelta (`reviewer`, `reviewer-security` y `reviewer-ui`: APROBADO). Corregido además en `47c6e41`: la página de ejecución se recarga cuando solo cambia el `taskId` (el router reutiliza el componente; hallazgo medio de `reviewer-ui`, con prueba de navegación entre ejecuciones), la cabecera dice «Final result» y el exportador rechaza también `C:/`, `/Users/` y `/root/`. Los bajos restantes están en `docs/estado.md`.
+
+## 8. Cambio de alcance (2026-11-18): el paso alto de `eq_lowcut` no actúa
+
+**Hallazgo de la demostración.** En la tarea 3, `eq_lowcut` dejó la banda sub igual: −6,50 dB en el render frente a −6,46 dB en el mismo tramo sin efectos. La verificación dio `fail` (tarea `c7dc0e09-96a2-4fb4-937c-b726683ac5c2`, que no se publica). El autor comprobó en la ventana de ReaEQ que la banda 5 (High Pass) aparece **sin activar**: el preset fija `Freq-High Pass 5` a 80 Hz, pero la banda está apagada. La prueba de integración de F2a solo leía el valor mostrado del parámetro, no medía el sonido. Por eso no se detectó.
+
+**Alcance.** Entra:
+- que un preset fije ajustes de configuración del plugin, de una lista cerrada;
+- que el puente los aplique con `TrackFX_SetNamedConfigParm` y los relea;
+- una prueba con Reaper real que mida la caída de la banda sub;
+- repetir la tarea 3 de la demostración.
+
+No entra: revisar los rangos de los presets (pregunta abierta 7) ni otros plugins.
+
+**Contexto para el implementador.**
+- **API de Reaper:** `TrackFX_SetNamedConfigParm(track, fx, name, value)` devuelve `true` si el plugin acepta la clave. `TrackFX_GetNamedConfigParm(track, fx, name)` devuelve `ok, value`. En ReaEQ, las claves `BANDENABLEDx` usan índice desde 0: la banda 5 es `BANDENABLED4`, con valor `"1"` (activa) o `"0"`. **Comprobarlo primero en T10 con Reaper real.** Si la clave no existe o no activa la banda, para y avisa antes de seguir.
+- **Lo que hay hoy** (`libs/core/src/daw.ts`):
+  - `FxChainSchema` = `[{ plugin, params: [{ name, value }] }]`.
+  - `AppliedFxChainSchema` = `{ trackId, fx: [{ plugin, params: [{ name, text }] }] }`.
+  - `PresetSchema.fx[]` = `{ plugin, params: record<name, { knob } | { value }> }`.
+  - `ALLOWED_FX_PLUGINS`, repetida en `bridge.lua` como `FX_ALLOWED`.
+  - La resolución de preset a cadena está en `libs/tools/src/apply-fx-chain.ts`. `bridge.lua` `methods.apply_fx_chain` valida la entrada antes del bloque de deshacer, añade los FX dentro de él y, si algo falla, borra los añadidos. `FakeDaw.applyFxChain` está en `libs/testing`.
+- **Reglas que aplican:**
+  - **3 y 4:** contrato zod primero, y una prueba por contrato.
+  - **11:** el conjunto de comandos es cerrado. Las claves de configuración son una lista cerrada por plugin, validada en `core` (al cargar los presets) y otra vez en el puente. Nunca se pasa una clave libre.
+  - **12:** el ajuste va dentro del mismo bloque de deshacer que el FX.
+- **Seguridad:** `reviewer-security` revisa este cambio, porque toca `reaper/bridge/` y `libs/adapters/reaper/`.
+
+**Contrato nuevo.**
+- **`ALLOWED_FX_CONFIG`** (en `core`, repetida en `bridge.lua` como `FX_CONFIG_ALLOWED`, y deben ser iguales): `{ "ReaEQ (Cockos)": /^BANDENABLED[0-9]$/ }`, con valores `/^[01]$/`.
+- **`PresetSchema.fx[]`** gana `config?: record<string, string>`. `loadPresets` rechaza una clave o un valor fuera de la lista del plugin, así que el servidor no arranca con un preset inválido.
+- **`FxChainSchema`:** cada entrada gana `config: [{ name, value }]`, con `[]` por defecto.
+- **`AppliedFxChainSchema`:** cada entrada gana `config: [{ name, value }]`, con el valor releído de Reaper. La salida de `apply_fx_chain` lo incluye, y así el LLM y el Replay ven que la banda quedó activa.
+- **Errores en el puente:**
+  - una clave no permitida da `fx_not_allowed`;
+  - si `SetNamedConfigParm` devuelve `false`, da `param_not_found`;
+  - en los dos casos se borran los FX añadidos, como hoy.
+
+  Los dos códigos ya existen y el adaptador los traduce a `daw_error`.
+- **`reaper/presets/eq_lowcut.json`:** `"config": { "BANDENABLED4": "1" }` en la entrada de ReaEQ.
+
+**Qué cambia, por carpeta.**
+
+| Ruta | Cambio |
+|---|---|
+| `libs/core/` | `ALLOWED_FX_CONFIG`, `config` en `PresetSchema`, `FxChainSchema` y `AppliedFxChainSchema`, con pruebas |
+| `libs/tools/` | `loadPresets` valida `config`; `apply-fx-chain.ts` lo pasa a la cadena y lo devuelve |
+| `libs/testing/` | `FakeDaw.applyFxChain` devuelve el `config` recibido |
+| `reaper/bridge/` | `FX_CONFIG_ALLOWED`; validación, `SetNamedConfigParm` y relectura en `apply_fx_chain` |
+| `libs/adapters/reaper/` | Prueba `*.reaper.test.ts` que mide el sonido |
+| `reaper/presets/` | `eq_lowcut.json` con `config` |
+| `docs/` | Documento maestro v2.12 (sección 7: fila de `apply_fx_chain` y «Presets de FX como datos»; sección 8.2: el puente se defiende solo, punto (1), y parámetros de FX), `CHANGELOG.md` y `estado.md` |
+
+**Decisiones.**
+
+| Decisión | Alternativa descartada |
+|---|---|
+| `config` genérico en el preset, con una lista cerrada de claves por plugin | Que el puente active la banda 5 siempre que añade ReaEQ: es un caso especial oculto y no sirve para otras bandas ni plugins |
+| Releer el valor y devolverlo en la salida | Fiarse del `true` de `Set`: sería repetir el error de F2a, que solo comprobaba la escritura |
+| Prueba que mide el sonido, con Python real | Comprobar solo `GetNamedConfigParm`: la banda podría estar activa y aun así no filtrar |
+| Las tareas siguen con T9-T11, por encima del máximo de 8, como corrección de la fase | Abrir una fase aparte: retrasa el cierre de F3 por un fallo de F2a de tres tareas |
+
+**Riesgos.**
+- **La clave puede no llamarse como suponemos.** T10 empieza comprobándola.
+- **La pendiente del paso alto de ReaEQ es desconocida.** Por eso el umbral de la prueba es moderado.
+
+**Tareas.**
+
+- [ ] **T9. Contrato de `config` y presets.**
+  - Cambios:
+    - `ALLOWED_FX_CONFIG` y `config` en los tres esquemas de `core`.
+    - Validación en `loadPresets`.
+    - `apply-fx-chain.ts` y `FakeDaw` pasan y devuelven `config`.
+    - `eq_lowcut.json` con `BANDENABLED4: "1"`.
+  - Hecho cuando hay pruebas que demuestran que:
+    - un preset con `config` permitido valida;
+    - una clave no permitida (`FOO`, o `BANDENABLED4` en `ReaLimit`) o un valor `"2"` hacen fallar `loadPresets`;
+    - `apply_fx_chain` con `FakeDaw` y `eq_lowcut` envía `config: [{ name: "BANDENABLED4", value: "1" }]` y lo devuelve en la salida;
+    - las cadenas sin `config` siguen funcionando;
+    - `pnpm check` sale en verde.
+- [ ] **T10. Puente y prueba con Reaper real.**
+  - Cambios:
+    - `FX_CONFIG_ALLOWED` y la validación antes del bloque de deshacer.
+    - `TrackFX_SetNamedConfigParm` y `TrackFX_GetNamedConfigParm` dentro del bloque, con limpieza si falla.
+    - Prueba nueva en `reaper-daw.reaper.test.ts`.
+  - Hecho cuando:
+    - **Primero:** con Reaper real, `BANDENABLED4 = "1"` se acepta y se relee como `"1"`. Si no es así, para y avisa.
+    - **La prueba del sonido pasa:** genera en el workspace un WAV de 4 s con un seno de 40 Hz y otro de 1 kHz (−12 dBFS cada uno), lo importa, le aplica la cadena de `eq_lowcut` resuelta del preset, lo renderiza y lo mide con `PythonAnalyzer`. La banda `sub` del render debe bajar al menos 6 dB respecto al original, y `mid` no debe cambiar más de 1 dB.
+    - **La clave prohibida se rechaza:** una clave no permitida da `fx_not_allowed` sin dejar FX en la pista.
+    - **Verificación:** `pnpm check` en verde, y `pnpm test:reaper` en verde en local.
+- [ ] **T11. Documentación y repetición de la tarea 3.**
+  - Cambios:
+    - Documento maestro v2.12 en las secciones indicadas.
+    - `CHANGELOG.md` y `docs/estado.md`, dentro de sus 30 líneas.
+  - Hecho cuando:
+    - el documento no contradice lo implementado;
+    - `pnpm check:full` sale en verde;
+    - el autor repite la tarea 3 con un `taskId` nuevo, la verificación de la banda sub da `pass` y la salida de `apply_fx_chain` muestra `BANDENABLED4: "1"`.
