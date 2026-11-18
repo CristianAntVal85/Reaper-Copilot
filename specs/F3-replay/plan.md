@@ -340,7 +340,8 @@ No entra: revisar los rangos de los presets (pregunta abierta 7) ni otros plugin
     - `apply_fx_chain` con `FakeDaw` y `eq_lowcut` envía `config: [{ name: "BANDENABLED4", value: "1" }]` y lo devuelve en la salida;
     - las cadenas sin `config` siguen funcionando;
     - `pnpm check` sale en verde.
-- [ ] **T10. Puente y prueba con Reaper real.**
+- [x] **T10. Puente y prueba con Reaper real.**
+  - Nota: `TrackFX_SetNamedConfigParm` devuelve `false` para `BANDENABLED4` aunque lo aplica (Reaper 7.86); el puente no se fía del retorno y solo da por bueno el valor releído.
   - Cambios:
     - `FX_CONFIG_ALLOWED` y la validación antes del bloque de deshacer.
     - `TrackFX_SetNamedConfigParm` y `TrackFX_GetNamedConfigParm` dentro del bloque, con limpieza si falla.
