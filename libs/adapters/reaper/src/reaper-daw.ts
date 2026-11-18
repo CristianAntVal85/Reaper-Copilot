@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import {
   CopilotError,
   AppliedFxChainSchema,
+  FxChainSchema,
   type AppliedFxChain,
   type AssetPath,
   type DawItem,
@@ -158,7 +159,7 @@ export class ReaperDaw implements DawPort {
   }
 
   async applyFxChain(trackId: TrackId, chain: FxChain): Promise<AppliedFxChain> {
-    return this.call("apply_fx_chain", { trackId, chain }, AppliedFxChainSchema);
+    return this.call("apply_fx_chain", { trackId, chain: FxChainSchema.parse(chain) }, AppliedFxChainSchema);
   }
 
   /** Starts a render and returns its job id at once; `getJob` reports how it ends. */

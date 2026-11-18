@@ -8,7 +8,7 @@ export const applyFxChain = defineTool({
     "Add a preset's FX chain at the end of a track's FX list (existing FX are kept). trackId comes from get_project_state; " +
     "preset is an id from list_presets; knobs (optional) maps knob names to numbers within each knob's min and max; " +
     "omitted knobs use their default. An unknown knob or a value out of range fails with out_of_range and changes nothing. " +
-    "Returns {trackId, preset, fx: [{plugin, params: [{name, text}]}]} where text is the value the plugin displays. " +
+    "Returns {trackId, preset, fx: [{plugin, params: [{name, text}], config: [{name, value}]}]} where text is the value the plugin displays and config lists the plugin settings read back after setting them. " +
     "To readjust, call undo_last and apply again.",
   risk: "write",
   inputSchema: z.strictObject({
@@ -23,6 +23,7 @@ export const applyFxChain = defineTool({
       z.strictObject({
         plugin: z.string(),
         params: z.array(z.strictObject({ name: z.string(), text: z.string() })),
+        config: z.array(z.strictObject({ name: z.string(), value: z.string() })),
       }),
     ),
   }),
@@ -47,6 +48,7 @@ export const applyFxChain = defineTool({
         if (!knob) throw new CopilotError("preset_not_found", "the preset is inconsistent");
         return { name, value: Object.hasOwn(knobs, param.knob) ? (knobs[param.knob] as number) : knob.default };
       }),
+      config: Object.entries(fx.config ?? {}).map(([name, value]) => ({ name, value })),
     }));
 
     const applied = await ctx.daw.applyFxChain(trackId, chain);

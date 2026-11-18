@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  ALLOWED_FX_CONFIG,
   AppliedFxChainSchema,
   DawItemSchema,
   FxChainSchema,
@@ -67,7 +68,23 @@ describe("FxChain and AppliedFxChain", () => {
   it("validate their shape", () => {
     expect(FxChainSchema.safeParse([{ plugin: "ReaEQ (Cockos)", params: [{ name: "a", value: 1 }] }]).success).toBe(true);
     expect(FxChainSchema.safeParse([{ plugin: "", params: [] }]).success).toBe(false);
-    expect(AppliedFxChainSchema.safeParse({ trackId: GUID, fx: [{ plugin: "p", params: [{ name: "a", text: "1.0" }] }] }).success).toBe(true);
+    expect(AppliedFxChainSchema.safeParse({ trackId: GUID, fx: [{ plugin: "p", params: [{ name: "a", text: "1.0" }], config: [] }] }).success).toBe(true);
+    expect(AppliedFxChainSchema.safeParse({ trackId: GUID, fx: [{ plugin: "p", params: [] }] }).success).toBe(false);
+  });
+
+  it("defaults config to an empty list and accepts name/value settings", () => {
+    expect(FxChainSchema.parse([{ plugin: "ReaEQ (Cockos)", params: [] }])[0]?.config).toEqual([]);
+    expect(FxChainSchema.safeParse([{ plugin: "p", params: [], config: [{ name: "BANDENABLED4", value: "1" }] }]).success).toBe(true);
+    expect(FxChainSchema.safeParse([{ plugin: "p", params: [], config: [{ name: "", value: "1" }] }]).success).toBe(false);
+  });
+
+  it("lists the allowed FX config settings per plugin", () => {
+    const eq = ALLOWED_FX_CONFIG["ReaEQ (Cockos)"];
+    expect(eq?.key.test("BANDENABLED4")).toBe(true);
+    expect(eq?.key.test("FOO")).toBe(false);
+    expect(eq?.value.test("1")).toBe(true);
+    expect(eq?.value.test("2")).toBe(false);
+    expect(ALLOWED_FX_CONFIG["ReaLimit (Cockos)"]).toBeUndefined();
   });
 });
 

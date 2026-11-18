@@ -328,7 +328,7 @@ No entra: revisar los rangos de los presets (pregunta abierta 7) ni otros plugin
 
 **Tareas.**
 
-- [ ] **T9. Contrato de `config` y presets.**
+- [x] **T9. Contrato de `config` y presets.**
   - Cambios:
     - `ALLOWED_FX_CONFIG` y `config` en los tres esquemas de `core`.
     - Validación en `loadPresets`.
