@@ -6,7 +6,7 @@ export const AUDIO_FEATURES_SCHEMA_VERSION = 2;
  * Revision of the analysis method in `python/analysis`. Bump it by hand whenever the method
  * changes without a contract change, so cached analyses from the old method are not reused.
  */
-export const ANALYSIS_REVISION = "1";
+export const ANALYSIS_REVISION = "2";
 
 /** Revision part of the analysis cache key: contract version plus method revision. */
 export const ANALYSIS_CACHE_REVISION = `${AUDIO_FEATURES_SCHEMA_VERSION}.${ANALYSIS_REVISION}`;

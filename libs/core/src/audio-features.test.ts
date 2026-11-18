@@ -34,7 +34,7 @@ describe("AudioFeaturesSchema", () => {
   });
 
   it("exposes the analysis revision", () => {
-    expect(ANALYSIS_REVISION).toBe("1");
+    expect(ANALYSIS_REVISION).toBe("2");
   });
 
   it("derives its type with z.infer", () => {

@@ -9,7 +9,10 @@ HOP_LENGTH = 64
 FRAMES_PER_SEC = SAMPLE_RATE / HOP_LENGTH
 STEP_BPM = 0.05
 BEAT_MULTIPLES = (1, 2, 4, 8)
-DEFAULT_RANGE = (140.0, 230.0)
+# One full octave, so each tempo has a single reading in it: 135 BPM (below the old 140) read as 180.
+DEFAULT_RANGE = (115.0, 230.0)
+# Half and double, plus the ternary confusions (3:2 and 4:3) that a comb over beat multiples can make.
+ALTERNATIVE_RATIOS = (1 / 2, 2.0, 2 / 3, 3 / 2, 3 / 4, 4 / 3)
 MATCH_TOLERANCE_BPM = 1.0
 
 
@@ -61,4 +64,11 @@ def estimate_tempo(mono_22050: np.ndarray, target_bpm: float | None = None) -> T
     if target_bpm is not None:
         deviation = round(bpm - target_bpm, 2)
         target = TempoTarget(target_bpm, deviation, abs(deviation) <= MATCH_TOLERANCE_BPM)
-    return Tempo(bpm, round(confidence, 3), [round(bpm / 2, 2), round(bpm * 2, 2)], target)
+    return Tempo(bpm, round(confidence, 3), _ranked_alternatives(envelope, bpm), target)
+
+
+def _ranked_alternatives(envelope: np.ndarray, bpm: float) -> list[float]:
+    candidates = [round(bpm * ratio, 2) for ratio in ALTERNATIVE_RATIOS]
+    scores = _comb_scores(envelope, np.array(candidates))
+    order = sorted(range(len(candidates)), key=lambda i: -scores[i])
+    return [candidates[i] for i in order]

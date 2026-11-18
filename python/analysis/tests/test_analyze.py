@@ -15,7 +15,7 @@ def run(*args: str):
     )
 
 
-@pytest.mark.parametrize("bpm", [150, 174, 200])
+@pytest.mark.parametrize("bpm", [120, 135, 150, 174, 200])
 @pytest.mark.parametrize("use_target", [False, True])
 def test_click_track_tempo_within_half_bpm(write_wav, bpm, use_target):
     path = write_wav(f"clicks{bpm}.wav", click_track(bpm))
@@ -24,9 +24,33 @@ def test_click_track_tempo_within_half_bpm(write_wav, bpm, use_target):
     assert result.returncode == 0, result.stderr
     tempo = json.loads(result.stdout)["tempo"]
     assert abs(tempo["bpm"] - bpm) <= 0.5
-    assert tempo["alternatives"] == [round(tempo["bpm"] / 2, 2), round(tempo["bpm"] * 2, 2)]
+    measured = tempo["bpm"]
+    expected = {round(measured * ratio, 2) for ratio in (1 / 2, 2, 2 / 3, 3 / 2, 3 / 4, 4 / 3)}
+    assert len(tempo["alternatives"]) == 6
+    assert set(tempo["alternatives"]) == expected
     assert 0 <= tempo["confidence"] <= 1
     assert (tempo["target"] is None) == (not use_target)
+
+
+def test_alternatives_are_ordered_from_most_to_least_likely():
+    import librosa
+
+    from analysis.tempo import HOP_LENGTH, SAMPLE_RATE, _comb_scores, estimate_tempo
+
+    mono = click_track(135, sr=SAMPLE_RATE)
+    tempo = estimate_tempo(mono)
+    envelope = librosa.onset.onset_strength(y=mono, sr=SAMPLE_RATE, hop_length=HOP_LENGTH)
+    scores = _comb_scores(envelope, np.array(tempo.alternatives, dtype=float))
+    assert len(scores) == 6
+    assert all(a >= b - 1e-9 for a, b in zip(scores, scores[1:]))
+
+
+def test_without_target_a_ternary_confusion_is_listed(write_wav):
+    # A tempo outside the default octave is reported in an octave of its own, and the true tempo
+    # shows up among the alternatives.
+    tempo = _tempo(write_wav, 90)
+    assert abs(tempo["bpm"] - 180) <= 0.5
+    assert any(abs(alt - 90) <= 0.5 for alt in tempo["alternatives"])
 
 
 def _tempo(write_wav, bpm, *extra):
