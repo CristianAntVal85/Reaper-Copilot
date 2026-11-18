@@ -42,7 +42,7 @@ describe("AnalysisCacheKeySchema", () => {
   });
 
   it("builds the revision from the schema version and the analysis revision", () => {
-    expect(ANALYSIS_CACHE_REVISION).toBe("2.1");
+    expect(ANALYSIS_CACHE_REVISION).toBe("2.2");
   });
 });
 
