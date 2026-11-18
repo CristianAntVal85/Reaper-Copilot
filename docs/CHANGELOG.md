@@ -3,6 +3,7 @@
 Entradas nuevas arriba. Una línea por cambio relevante: fecha, fase o vía, qué se hizo y, si cambió una decisión del documento maestro, cuál.
 
 ## 2026-11-18
+- F3-replay, demostración: tres ejecuciones reales con audio propio del autor publicadas en `apps/web/public/runs/` (`ad48352`): loop a 140 BPM, 180 BPM con distorsión (falla el intento 1 y pasa el 2) y paso alto en los graves profundos; borradas las dos ejecuciones de prueba del click. Revisión del arreglo de `eq_lowcut`: `reviewer` y `reviewer-security`, APROBADO, con bajos anotados en `estado.md`.
 - Documento maestro v2.12: ajustes de configuración de FX (`config`) con lista cerrada `ALLOWED_FX_CONFIG` (7, 8.2). Hallazgo de la demostración (tarea 3): `eq_lowcut` no filtraba. Causa: ReaEQ trae la banda 5 (paso alto) apagada y el preset solo fijaba la frecuencia. Arreglo: `config` en presets y en la salida de `apply_fx_chain` (`3ca2fb2`) y aplicación en el puente con `TrackFX_SetNamedConfigParm` y relectura, porque Reaper 7.86 devuelve `false` aunque aplica (`d28d017`). Medido: `sub` −12,00 → −24,54 dB y `mid` −12,00 → −12,01 dB.
 
 ## 2026-11-17
