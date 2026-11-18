@@ -2,6 +2,9 @@
 
 Entradas nuevas arriba. Una línea por cambio relevante: fecha, fase o vía, qué se hizo y, si cambió una decisión del documento maestro, cuál.
 
+## 2026-11-18
+- Documento maestro v2.12: ajustes de configuración de FX (`config`) con lista cerrada `ALLOWED_FX_CONFIG` (7, 8.2). Hallazgo de la demostración (tarea 3): `eq_lowcut` no filtraba. Causa: ReaEQ trae la banda 5 (paso alto) apagada y el preset solo fijaba la frecuencia. Arreglo: `config` en presets y en la salida de `apply_fx_chain` (`3ca2fb2`) y aplicación en el puente con `TrackFX_SetNamedConfigParm` y relectura, porque Reaper 7.86 devuelve `false` aunque aplica (`d28d017`). Medido: `sub` −12,00 → −24,54 dB y `mid` −12,00 → −12,01 dB.
+
 ## 2026-11-17
 - F3-replay, primera vuelta de validación corregida: enlace de la ruta con `withComponentInputBinding()`, MP3 exportados no ignorados, reproductores, espectro y tabla legibles en móvil, contexto para el visitante, petición en su idioma original (decisión del usuario; 4.2), exportador más estricto y permisos mínimos del workflow de Pages.
 - Fase F3-replay implementada (8 de 8 tareas), pendiente de revisión, demostración y pull request: contratos `ReplayAssets`, `ReplayRun` e índice en `core`, `AnalyzerPort.replayAssets` y `listToolCalls` con `taskId`, subcomando `replay-assets` (MP3 con `soundfile`, forma de onda y espectro), `pnpm replay:export`, aplicación Angular `apps/web` (lista, página de ejecución y panel de audio en SVG propio), workflow de GitHub Pages y README en inglés.
