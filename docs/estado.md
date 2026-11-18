@@ -13,7 +13,7 @@ Memoria entre sesiones. **Máximo 30 líneas, una idea por línea.** Lo que ya n
 - Caché y almacenamiento: no guardar si el sha256 de Python difiere de la clave; validar la clave en `SqliteStorage` (objetivo 0 chocaría con «sin objetivo»); `hashFile` da `file_not_found` también con EACCES o EISDIR; `mcp:traces` abre la base en escritura; suite de almacenamiento duplicada. De F2b: el tope de 50 verificaciones se comprueba fuera del `INSERT` (dos llamadas concurrentes lo pasan por una) y no cuenta filas corruptas; `reserveTask` gasta hueco aunque `createTask` falle; tipo `NewVerification` sin usar.
 
 ## Siguiente paso
-- Publicación aplazada por el usuario: Pages sin activar y workflow `pages` desactivado (`gh workflow enable pages` lo reactiva). El usuario usará el copiloto y elegirá las ejecuciones; la entrada pública será su portfolio. Siguiente: plan de despliegue en el portátil servidor y fase 4 (Live).
+- Publicación aplazada por el usuario: Pages sin activar y workflow `pages` desactivado (`gh workflow enable pages` lo reactiva). El usuario usará el copiloto y elegirá las ejecuciones; la entrada pública será su portfolio. Siguiente: fase 4 (Live), empezando por el spike de Reaper sin pantalla (Xvfb) en el portátil servidor. Antes, el usuario necesita acceso SSH al portátil y un dominio para el portfolio (aún no tiene ninguno). Propuesta pendiente de decidir: portfolio y Replay en hosting estático; Live y otras apps en el portátil con Docker Compose tras Cloudflare Tunnel; Reaper nativo con `systemd` (cambia 11.3).
 
 ## Hecho
 - Fases 0, F0b, F1a, F1b, F2a y F2b cerradas; diseño en `docs/reaper-copilot.md` v2.12. Detalle en `docs/CHANGELOG.md`.
