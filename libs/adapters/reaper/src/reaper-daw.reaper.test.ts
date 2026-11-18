@@ -57,6 +57,74 @@ function clickTrack(bpm: number, bars: number, leadSec: number, sampleRate = 220
   return Buffer.concat([header, data]);
 }
 
+/** Mono 16-bit PCM WAV at 48 kHz: a 40 Hz and a 1 kHz sine, each at -12 dBFS. */
+function twoTones(seconds: number): Buffer {
+  const sampleRate = 48000;
+  const amp = 10 ** (-12 / 20);
+  const samples = Math.round(seconds * sampleRate);
+  const data = Buffer.alloc(samples * 2);
+  for (let i = 0; i < samples; i++) {
+    const v = amp * (Math.sin((2 * Math.PI * 40 * i) / sampleRate) + Math.sin((2 * Math.PI * 1000 * i) / sampleRate));
+    data.writeInt16LE(Math.round(32767 * v), i * 2);
+  }
+  const header = Buffer.from(wav(0, sampleRate).subarray(0, 44));
+  header.writeUInt32LE(36 + data.length, 4);
+  header.writeUInt32LE(sampleRate * 2, 28);
+  header.writeUInt32LE(data.length, 40);
+  return Buffer.concat([header, data]);
+}
+
+/**
+ * Level in dB of one frequency in the first channel of a PCM or float WAV, between `fromSec` and `toSec`
+ * (Goertzel). The adapter may depend only on core, so the analysis-py adapter is not available here; a single
+ * known frequency does not need more than this.
+ */
+function toneLevelDb(file: Buffer, freq: number, fromSec: number, toSec: number): number {
+  let channels = 1;
+  let rate = 48000;
+  let bits = 16;
+  let float = false;
+  let dataAt = 0;
+  let dataSize = 0;
+  for (let at = 12; at + 8 <= file.length; ) {
+    const id = file.toString("latin1", at, at + 4);
+    const size = file.readUInt32LE(at + 4);
+    if (id === "fmt ") {
+      const tag = file.readUInt16LE(at + 8);
+      channels = file.readUInt16LE(at + 10);
+      rate = file.readUInt32LE(at + 12);
+      bits = file.readUInt16LE(at + 22);
+      float = tag === 3 || (tag === 0xfffe && file.readUInt16LE(at + 32) === 3);
+    } else if (id === "data") {
+      dataAt = at + 8;
+      dataSize = Math.min(size, file.length - dataAt);
+      break;
+    }
+    at += 8 + size + (size % 2);
+  }
+  const bytes = bits / 8;
+  const frames = Math.floor(dataSize / (bytes * channels));
+  const sampleAt = (n: number): number => {
+    const o = dataAt + n * channels * bytes;
+    if (float) return file.readFloatLE(o);
+    if (bits === 16) return file.readInt16LE(o) / 32768;
+    if (bits === 24) return file.readIntLE(o, 3) / 8388608;
+    return file.readInt32LE(o) / 2147483648;
+  };
+  const first = Math.round(fromSec * rate);
+  const last = Math.min(frames, Math.round(toSec * rate));
+  let re = 0;
+  let im = 0;
+  for (let n = first; n < last; n++) {
+    const phase = (2 * Math.PI * freq * n) / rate;
+    const x = sampleAt(n);
+    re += x * Math.cos(phase);
+    im -= x * Math.sin(phase);
+  }
+  const amplitude = (2 * Math.hypot(re, im)) / (last - first);
+  return 20 * Math.log10(amplitude);
+}
+
 let tmp: string | undefined;
 
 const DISTRO = process.env["WSL_DISTRO_NAME"];
@@ -258,7 +326,9 @@ describe("Reaper bridge (real)", () => {
     expect(Math.abs(text(1, "Ceiling") + 0.3)).toBeLessThan(0.01);
 
     await daw.applyFxChain(track.id, [{ plugin: "ReaLimit (Cockos)", params: [{ name: "Threshold", value: -9 }, { name: "Ceiling", value: -1 }] }]);
-    await daw.applyFxChain(track.id, [{ plugin: "ReaEQ (Cockos)", params: [{ name: "Freq-High Pass 5", value: 80 }] }]);
+    await daw.applyFxChain(track.id, [
+      { plugin: "ReaEQ (Cockos)", params: [{ name: "Freq-High Pass 5", value: 80 }], config: [{ name: "BANDENABLED4", value: "1" }] },
+    ]);
 
     const tooHigh = await daw
       .applyFxChain(track.id, [{ plugin: "ReaLimit (Cockos)", params: [{ name: "Threshold", value: 50 }] }])
@@ -356,6 +426,70 @@ describe("Reaper bridge (real)", () => {
       const job = await waitForJob(await daw.render(item.id, asAssetPath("/tmp/rca-outside-render.wav")));
       expect(job).toMatchObject({ status: "failed", errorCode: "path_outside_workspace" });
       expect((await daw.getProjectState()).tracks.length).toBe(before.tracks.length + 1);
+    } finally {
+      await restore(before.tracks.map((t) => t.id));
+    }
+  });
+
+  it("eq_lowcut enables the ReaEQ high-pass band: the 40 Hz tone drops, the 1 kHz tone stays", async () => {
+    await mkdir(WORKSPACE, { recursive: true });
+    tmp ??= await mkdtemp(path.join(WORKSPACE, "test-reaper-"));
+    const file = path.join(tmp, "lowcut.wav");
+    await writeFile(file, twoTones(4));
+    const plain = path.join(tmp, "lowcut-plain.wav");
+    const cut = path.join(tmp, "lowcut-cut.wav");
+    const before = await daw.getProjectState();
+    try {
+      const { track, item } = await daw.importAudio(asAssetPath(file));
+      expect((await waitForJob(await daw.render(item.id, asAssetPath(plain)))).status).toBe("done");
+
+      // Literal copy of reaper/presets/eq_lowcut.json at its default cutoff: an adapter may depend only on core,
+      // and the preset resolver lives in tools.
+      const applied = await daw.applyFxChain(track.id, [
+        { plugin: "ReaEQ (Cockos)", params: [{ name: "Freq-High Pass 5", value: 80 }], config: [{ name: "BANDENABLED4", value: "1" }] },
+      ]);
+      expect(applied.fx[0]?.config).toEqual([{ name: "BANDENABLED4", value: "1" }]);
+      expect((await waitForJob(await daw.render(item.id, asAssetPath(cut)))).status).toBe("done");
+
+      const a = await readFile(plain);
+      const b = await readFile(cut);
+      const sub = [toneLevelDb(a, 40, 1, 3), toneLevelDb(b, 40, 1, 3)] as const;
+      const mid = [toneLevelDb(a, 1000, 1, 3), toneLevelDb(b, 1000, 1, 3)] as const;
+      console.log(`sub before/after: ${sub[0].toFixed(2)} / ${sub[1].toFixed(2)} dB; mid: ${mid[0].toFixed(2)} / ${mid[1].toFixed(2)} dB`);
+      expect(sub[0] - sub[1]).toBeGreaterThanOrEqual(6);
+      expect(Math.abs(mid[1] - mid[0])).toBeLessThanOrEqual(1);
+    } finally {
+      await restore(before.tracks.map((t) => t.id));
+      await rm(plain, { force: true });
+      await rm(cut, { force: true });
+    }
+  });
+
+  it("refuses a FX config key outside the closed list and leaves no FX behind", async () => {
+    await mkdir(WORKSPACE, { recursive: true });
+    tmp ??= await mkdtemp(path.join(WORKSPACE, "test-reaper-"));
+    const file = path.join(tmp, "config-guard.wav");
+    await writeFile(file, wav(1));
+    const before = await daw.getProjectState();
+    try {
+      const { track } = await daw.importAudio(asAssetPath(file));
+      const bad = [
+        { name: "BANDENABLED10", value: "1" },
+        { name: "FILE", value: "1" },
+        { name: "BANDENABLED4", value: "2" },
+      ];
+      for (const config of bad) {
+        const refused = await daw
+          .applyFxChain(track.id, [{ plugin: "ReaEQ (Cockos)", params: [], config: [config] }])
+          .catch((e: unknown) => e);
+        expect(refused).toBeInstanceOf(CopilotError);
+        expect(refused).toMatchObject({ code: "daw_error" });
+      }
+      const wrongPlugin = await daw
+        .applyFxChain(track.id, [{ plugin: "ReaLimit (Cockos)", params: [], config: [{ name: "BANDENABLED4", value: "1" }] }])
+        .catch((e: unknown) => e);
+      expect(wrongPlugin).toMatchObject({ code: "daw_error" });
+      expect((await daw.getProjectState()).tracks.at(-1)?.fx).toEqual([]);
     } finally {
       await restore(before.tracks.map((t) => t.id));
     }

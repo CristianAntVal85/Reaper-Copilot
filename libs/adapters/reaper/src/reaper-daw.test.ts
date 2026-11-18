@@ -307,12 +307,12 @@ describe("ReaperDaw", () => {
 
   it("applies an FX chain and validates the answer", async () => {
     const seen: { method: string; params: unknown }[] = [];
-    const chain = [{ plugin: "ReaLimit (Cockos)", params: [{ name: "Threshold", value: -6 }] }];
+    const chain = [{ plugin: "ReaLimit (Cockos)", params: [{ name: "Threshold", value: -6 }], config: [] }];
     handler = (method, params) => {
       seen.push({ method, params });
       return {
         ok: true,
-        result: { trackId: TRACK, fx: [{ plugin: "ReaLimit (Cockos)", params: [{ name: "Threshold", text: "-6.00" }] }] },
+        result: { trackId: TRACK, fx: [{ plugin: "ReaLimit (Cockos)", params: [{ name: "Threshold", text: "-6.00" }], config: [] }] },
       };
     };
     await bridge.start();

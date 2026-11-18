@@ -2,16 +2,33 @@ import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { asAssetPath, CopilotError, type AudioFeatures } from "@reaper-copilot/core";
+import {
+  asAssetPath,
+  CopilotError,
+  type AudioFeatures,
+  type ReplayAssets,
+} from "@reaper-copilot/core";
 import { childEnv, PythonAnalyzer } from "./python-analyzer.ts";
 
 const VALID: AudioFeatures = {
   schemaVersion: 2,
-  file: { sha256: "a".repeat(64), durationSec: 12.4, sampleRate: 44100, channels: 2 },
+  file: {
+    sha256: "a".repeat(64),
+    durationSec: 12.4,
+    sampleRate: 44100,
+    channels: 2,
+  },
   tempo: { bpm: 128, confidence: 0.82, alternatives: [64, 256], target: null },
   key: { tonic: "A", mode: "minor", confidence: 0.61 },
   loudness: { integratedLufs: -9.3, peakDb: -0.4 },
-  bands: { sub: -18.2, bass: -12.1, lowMid: -14, mid: -15.3, highMid: -17.8, high: -22.5 },
+  bands: {
+    sub: -18.2,
+    bass: -12.1,
+    lowMid: -14,
+    mid: -15.3,
+    highMid: -17.8,
+    high: -22.5,
+  },
   dynamics: { crestFactorDb: 7.9 },
 };
 
@@ -159,7 +176,9 @@ describe("PythonAnalyzer", () => {
   });
 
   it("maps a missing interpreter to analysis_failed", async () => {
-    const analyzer = new PythonAnalyzer({ pythonPath: join(dir, "does-not-exist") });
+    const analyzer = new PythonAnalyzer({
+      pythonPath: join(dir, "does-not-exist"),
+    });
     expect((await failure(analyzer.analyze(audio))).code).toBe("analysis_failed");
   });
 
@@ -177,7 +196,11 @@ describe("PythonAnalyzer", () => {
   it("kills the process when stdout exceeds the limit", async () => {
     const pythonPath = await fakePython("yes x | head -c 100000; exec sleep 30");
     const error = await failure(
-      new PythonAnalyzer({ pythonPath, maxOutputBytes: 1_000, timeoutMs: 10_000 }).analyze(audio),
+      new PythonAnalyzer({
+        pythonPath,
+        maxOutputBytes: 1_000,
+        timeoutMs: 10_000,
+      }).analyze(audio),
     );
     expect(error.code).toBe("analysis_failed");
     expect(error.message).toContain("exceeds");
@@ -193,6 +216,71 @@ describe("PythonAnalyzer", () => {
   it("rejects nonsensical limits", () => {
     expect(() => new PythonAnalyzer({ timeoutMs: 0 })).toThrow(RangeError);
     expect(() => new PythonAnalyzer({ maxOutputBytes: 1.5 })).toThrow(RangeError);
+  });
+});
+
+describe("PythonAnalyzer.replayAssets", () => {
+  const ASSETS: ReplayAssets = {
+    durationSec: 12.4,
+    waveform: {
+      min: Array<number>(800).fill(-0.5),
+      max: Array<number>(800).fill(0.5),
+    },
+    spectrum: {
+      freqHz: Array.from({ length: 96 }, (_, i) => 20 + i * 100),
+      db: Array<number>(96).fill(-40),
+    },
+  };
+
+  it("passes the output and input verbatim and returns the validated assets", async () => {
+    const argsFile = join(dir, "replay-args.txt");
+    const pythonPath = await fakePython(
+      `for a in "$@"; do printf '%s\\n' "$a"; done > '${argsFile}'\necho '${JSON.stringify(ASSETS)}'`,
+    );
+    const result = await new PythonAnalyzer({ pythonPath }).replayAssets(audio, "/out dir/a b.mp3");
+    expect(result).toEqual(ASSETS);
+    const args = (await readFile(argsFile, "utf8")).split("\n").slice(0, -1);
+    expect(args).toEqual([
+      "-m",
+      "analysis",
+      "replay-assets",
+      "--out",
+      "/out dir/a b.mp3",
+      "--",
+      audio,
+    ]);
+  });
+
+  it("maps JSON outside the schema to invalid_analysis_output", async () => {
+    const broken = { ...ASSETS, waveform: { min: [0], max: [0] } };
+    const pythonPath = await fakePython(`echo '${JSON.stringify(broken)}'`);
+    const error = await failure(new PythonAnalyzer({ pythonPath }).replayAssets(audio, "/o.mp3"));
+    expect(error.code).toBe("invalid_analysis_output");
+  });
+
+  it("maps exit codes like analyze", async () => {
+    const missing = await fakePython("exit 2");
+    expect(
+      (await failure(new PythonAnalyzer({ pythonPath: missing }).replayAssets(audio, "/o.mp3")))
+        .code,
+    ).toBe("file_not_found");
+    const format = await fakePython("exit 3");
+    expect(
+      (await failure(new PythonAnalyzer({ pythonPath: format }).replayAssets(audio, "/o.mp3")))
+        .code,
+    ).toBe("unsupported_format");
+    const other = await fakePython("exit 1");
+    expect(
+      (await failure(new PythonAnalyzer({ pythonPath: other }).replayAssets(audio, "/o.mp3"))).code,
+    ).toBe("analysis_failed");
+  });
+
+  it("times out like analyze", async () => {
+    const pythonPath = await fakePython("exec sleep 30");
+    const error = await failure(
+      new PythonAnalyzer({ pythonPath, timeoutMs: 300 }).replayAssets(audio, "/o.mp3"),
+    );
+    expect(error.code).toBe("analysis_timeout");
   });
 });
 

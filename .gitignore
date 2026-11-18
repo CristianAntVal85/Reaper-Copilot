@@ -28,3 +28,8 @@ spikes/**/out/
 # Audio de prueba con derechos de terceros
 .mp3/
 *.mp3
+# Replay exports are published with the site (own audio only)
+!apps/web/public/runs/**/*.mp3
+
+# Angular (apps/web)
+.angular/

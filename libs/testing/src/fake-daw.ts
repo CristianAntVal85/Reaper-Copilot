@@ -156,6 +156,7 @@ export class FakeDaw implements DawPort {
       fx: chain.map((fx) => ({
         plugin: fx.plugin,
         params: fx.params.map((p) => ({ name: p.name, text: p.value.toFixed(2) })),
+        config: (fx.config ?? []).map((c) => ({ name: c.name, value: c.value })),
       })),
     };
   }

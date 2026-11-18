@@ -3,6 +3,7 @@ import type {
   AnalyzerPort,
   AssetPath,
   AudioFeatures,
+  ReplayAssets,
 } from "@reaper-copilot/core";
 
 /** A valid `AudioFeatures` value, used when a test does not care about the content. */
@@ -15,6 +16,24 @@ export const SAMPLE_AUDIO_FEATURES: AudioFeatures = {
   bands: { sub: -30, bass: -20, lowMid: -22, mid: -24, highMid: -28, high: -35 },
   dynamics: { crestFactorDb: 12 },
 };
+
+/** Valid `ReplayAssets`: a flat waveform and a falling spectrum on 96 log-spaced bands. */
+export const SAMPLE_REPLAY_ASSETS: ReplayAssets = {
+  durationSec: 12.5,
+  waveform: {
+    min: Array.from({ length: 800 }, () => -0.5),
+    max: Array.from({ length: 800 }, () => 0.5),
+  },
+  spectrum: {
+    freqHz: Array.from({ length: 96 }, (_, i) => Math.round(20 * 1000 ** (i / 95) * 100) / 100),
+    db: Array.from({ length: 96 }, (_, i) => -20 - i * 0.5),
+  },
+};
+
+export interface ReplayAssetsCall {
+  readonly input: AssetPath;
+  readonly output: string;
+}
 
 export interface AnalyzerCall {
   readonly path: AssetPath;
@@ -29,6 +48,9 @@ export class FakeAnalyzer implements AnalyzerPort {
   /** When set, picks the result per analyzed path instead of `result`. */
   resultFor: ((path: AssetPath) => AudioFeatures) | undefined;
   readonly calls: AnalyzerCall[] = [];
+  readonly replayAssetsCalls: ReplayAssetsCall[] = [];
+  /** Result of `replayAssets`; when `error` is set, that is thrown instead. */
+  replayAssetsResult: ReplayAssets = SAMPLE_REPLAY_ASSETS;
 
   constructor(init: {
       result?: AudioFeatures;
@@ -44,5 +66,11 @@ export class FakeAnalyzer implements AnalyzerPort {
     this.calls.push({ path, options });
     if (this.error) throw this.error;
     return this.resultFor ? this.resultFor(path) : this.result;
+  }
+
+  async replayAssets(input: AssetPath, output: string): Promise<ReplayAssets> {
+    this.replayAssetsCalls.push({ input, output });
+    if (this.error) throw this.error;
+    return this.replayAssetsResult;
   }
 }

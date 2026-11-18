@@ -66,6 +66,15 @@ describe("FakeDaw", () => {
     await expect(daw.undo()).rejects.toMatchObject({ code: "nothing_to_undo" });
   });
 
+  it("returns the config it received, or an empty list", async () => {
+    const { daw, track } = await imported();
+    const applied = await daw.applyFxChain(track.id, [
+      { plugin: "ReaEQ (Cockos)", params: [], config: [{ name: "BANDENABLED4", value: "1" }] },
+      { plugin: "ReaLimit (Cockos)", params: [] },
+    ]);
+    expect(applied.fx.map((f) => f.config)).toEqual([[{ name: "BANDENABLED4", value: "1" }], []]);
+  });
+
   it("logs calls and fails on demand", async () => {
     const { daw } = await imported();
     daw.failures.setTempo = new Error("boom");

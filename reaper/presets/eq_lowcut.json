@@ -2,7 +2,7 @@
   "id": "eq_lowcut",
   "description": "High-pass filter that removes low-frequency rumble below the cutoff.",
   "fx": [
-    { "plugin": "ReaEQ (Cockos)", "params": { "Freq-High Pass 5": { "knob": "cutoff" } } }
+    { "plugin": "ReaEQ (Cockos)", "params": { "Freq-High Pass 5": { "knob": "cutoff" } }, "config": { "BANDENABLED4": "1" } }
   ],
   "knobs": {
     "cutoff": { "description": "High-pass cutoff frequency", "unit": "Hz", "min": 20, "max": 200, "default": 80 }

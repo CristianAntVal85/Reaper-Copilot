@@ -1,6 +1,6 @@
 # Reaper Copilot
 
-Documento maestro del proyecto (v2.10, 17-nov-2026). Es la fuente de verdad: sustituye a los borradores anteriores.
+Documento maestro del proyecto (v2.12, 18-nov-2026). Es la fuente de verdad: sustituye a los borradores anteriores.
 
 Lo leen tres públicos:
 
@@ -83,7 +83,8 @@ El producto se entrega en **tres bloques** sobre un mismo núcleo:
 - Reproduce **ejecuciones grabadas**: la petición, los pasos (llamadas a herramientas), los criterios y su resultado, con reproductores de audio antes y después, forma de onda y espectro.
 - No es un vídeo: es una página interactiva alimentada por archivos JSON y de audio exportados desde las trazas reales (sección 9). Un vídeo corto en el README la complementa.
 - Sin backend, sin API, sin Reaper. Coste cero.
-- Muestra un indicador "demo en vivo disponible / no disponible" consultando el estado del servidor Live.
+- El indicador "demo en vivo disponible / no disponible" llega en la fase 4, con el servidor Live.
+- La interfaz va en inglés, pero la petición original se muestra tal como la escribió el usuario (en su idioma), con la etiqueta «Original request», debajo del título en inglés. El sitio es una aplicación Angular 22.2 sin librerías de gráficas ni de audio: la forma de onda y el espectro son SVG propio sobre datos precalculados.
 - **Audio público:** solo material propio o con licencia que permita publicarlo. No usar fragmentos de canciones comerciales en la demo.
 
 ### 4.3 Bloque Live (portfolio, restringido)
@@ -206,6 +207,7 @@ interface DawPort {
 
 interface AnalyzerPort {
   analyze(path: AssetPath, options?: { targetBpm?: number }): Promise<AudioFeatures>;
+  replayAssets(input: AssetPath, output: string): Promise<ReplayAssets>; // escribe un MP3 en `output` (no puede existir) y devuelve forma de onda y espectro
 }
 
 // Trabajos y assets se añadirán en las fases siguientes.
@@ -221,7 +223,7 @@ interface StoragePort {
   getCachedAnalysis(key: AnalysisCacheKey): Promise<AudioFeatures | null>;
   putCachedAnalysis(key: AnalysisCacheKey, features: AudioFeatures): Promise<void>;
   recordToolCall(trace: ToolCallTrace): Promise<void>;
-  listToolCalls(options?: { limit?: number }): Promise<ToolCallTrace[]>; // más recientes primero
+  listToolCalls(options?: { limit?: number; taskId?: string }): Promise<ToolCallTrace[]>; // más recientes primero; con taskId, solo las de esa tarea
   createTask(task: Task): Promise<void>;
   getTask(taskId: string): Promise<Task | null>;
   recordVerification(verification: Omit<Verification, "attempt">): Promise<Verification>; // el almacenamiento asigna attempt = MAX + 1, atómico
@@ -252,13 +254,13 @@ Conjunto cerrado. Pocas, de alto nivel y con descripciones claras.
 | `set_tempo` | modifica | `{ bpm }` (40-320) → `{ tempo }` |
 | `slice_loop` | modifica | `{ itemId, sourceBpm, startBar, bars, beatsPerBar?, offsetSec? }` → item. Corte absoluto (idempotente); `out_of_range` si se sale de la fuente |
 | `time_stretch` | modifica | `{ itemId, sourceBpm, targetBpm }` → item. Estirado absoluto (idempotente); la tasa debe quedar en [0,5, 2] |
-| `apply_fx_chain` | modifica | `{ trackId, preset, knobs? }` → `{ trackId, preset, fx: [{ plugin, params: [{ name, text }] }] }`. Añade la cadena al final de la pista, sin tocar los FX existentes; los `knobs` fuera de rango o desconocidos se rechazan antes de llamar a Reaper y los omitidos toman su valor por defecto. Para reajustar: `undo_last` y aplicar otra vez |
+| `apply_fx_chain` | modifica | `{ trackId, preset, knobs? }` → `{ trackId, preset, fx: [{ plugin, params: [{ name, text }], config: [{ name, value }] }] }`, con el valor de `config` releído de Reaper. Añade la cadena al final de la pista, sin tocar los FX existentes; los `knobs` fuera de rango o desconocidos se rechazan antes de llamar a Reaper y los omitidos toman su valor por defecto. Para reajustar: `undo_last` y aplicar otra vez |
 | `render_selection` | modifica | `{ itemId }` → `{ jobId }`. Asíncrono. Renderiza la mezcla del master (otras pistas que suenen en ese tramo entran en el render) en los límites del item, a `workspace/renders/<AAAAMMDD-HHMMSS UTC>-<8 hex>.wav` (nombre generado por el servidor) |
 | `undo_last` | modifica | `{}` → `{ undone }`. Deshace el último bloque solo si su etiqueta empieza por `Copilot: `; si no, `nothing_to_undo`. Nunca deshace trabajo del usuario |
 
 En modo `mentor` solo se exponen las de lectura: siete (`get_project_state`, `list_presets`, `get_job_status`, `analyze_audio`, `compare_audio`, `start_task`, `verify_task`). En `agent`, las 14. `start_task` anuncia `readOnlyHint: true` aunque escribe en SQLite: solo registra la tarea y no cambia el proyecto del usuario.
 
-**Presets de FX como datos.** Las cadenas son JSON versionado en `reaper/presets/` (un archivo por preset, validado con `PresetSchema` al arrancar el servidor; uno inválido impide el arranque), con plugins de serie de Reaper. Cada parámetro es un `knob` (ajustable dentro de su rango, con `description`, `unit`, `min`, `max` y `default`) o un `value` fijo; todo `knob` usado debe estar definido y `default` ha de caer en `[min, max]`. Los valores van en unidades mostradas (dB, Hz, %), no normalizados. Presets de F2a, provisionales: `distortion_hard` (`JS: Waveshaping Distortion` y `ReaLimit`; knobs `drive` 0-90 % y `threshold` −12..0 dB), `limiter_loud` (`ReaLimit`; `threshold` −12..0 dB y `ceiling` −3..0 dB) y `eq_lowcut` (`ReaEQ`, paso alto; `cutoff` 20-200 Hz). `COPILOT_PRESETS` cambia la carpeta.
+**Presets de FX como datos.** Las cadenas son JSON versionado en `reaper/presets/` (un archivo por preset, validado con `PresetSchema` al arrancar el servidor; uno inválido impide el arranque), con plugins de serie de Reaper. Cada parámetro es un `knob` (ajustable dentro de su rango, con `description`, `unit`, `min`, `max` y `default`) o un `value` fijo; todo `knob` usado debe estar definido y `default` ha de caer en `[min, max]`. Los valores van en unidades mostradas (dB, Hz, %), no normalizados. Presets de F2a, provisionales: `distortion_hard` (`JS: Waveshaping Distortion` y `ReaLimit`; knobs `drive` 0-90 % y `threshold` −12..0 dB), `limiter_loud` (`ReaLimit`; `threshold` −12..0 dB y `ceiling` −3..0 dB) y `eq_lowcut` (`ReaEQ`, paso alto; `cutoff` 20-200 Hz). Cada FX puede llevar además `config` (ajustes de configuración del plugin, no parámetros), de una lista cerrada por plugin, `ALLOWED_FX_CONFIG` en `libs/core`; hoy solo ReaEQ, con `BANDENABLEDn` y valores `0` o `1`. Así `eq_lowcut` activa la banda 5 (`BANDENABLED4: "1"`), que ReaEQ trae apagada; sin ello el paso alto no filtraba. `COPILOT_PRESETS` cambia la carpeta.
 
 ---
 
@@ -267,6 +269,17 @@ En modo `mentor` solo se exponen las de lectura: siete (`get_project_state`, `li
 ### 8.1 TypeScript con Python
 
 - CLI: `python -m analysis analyze [--target-bpm N] -- <ruta>`. No hay subcomando `compare`: la comparación se calcula en TypeScript (sección 6.4). El `--` evita que un nombre de archivo se lea como opción.
+- `python -m analysis replay-assets --out <mp3> -- <entrada>` (F3). Escribe un MP3 CBR de unos 128 kbps con `soundfile` (`bitrate_mode=CONSTANT`, `compression_level=0.65`), sin sobrescribir: lo crea con un nombre temporal y lo renombra. Imprime por stdout un JSON `ReplayAssets` (esquema `ReplayAssetsSchema` en `libs/core/src/replay.ts`) y usa los mismos códigos de error y de salida que `analyze`. No hace falta ffmpeg.
+
+```json
+{
+  "durationSec": 5.65,
+  "waveform": { "min": [/* 800 valores en [-1, 1] */], "max": [/* 800 */] },
+  "spectrum": { "freqHz": [/* 96, crecientes, 20-20000 */], "db": [/* 96, mínimo -120 */] }
+}
+```
+
+- La forma de onda son 800 cubos con el mínimo y el máximo de cada uno. El espectro son 96 bandas logarítmicas de 20 Hz a 20 kHz, en dB con la misma referencia que `bands`.
 - Salida JSON por stdout; errores por stderr con un código legible al principio (`file_not_found: …`) y código de salida distinto de cero: 2 `file_not_found` (inexistente o ilegible), 3 `unsupported_format` (formato no admitido, audio de menos de 0,5 s o fallo al decodificar), 1 `analysis_failed` (cualquier otro error, incluidos los de argumentos).
 
 ```json
@@ -310,7 +323,7 @@ En modo `mentor` solo se exponen las de lectura: siete (`get_project_state`, `li
 - **Dónde corre Reaper.** En desarrollo, Reaper es nativo de Windows y el resto (servidor MCP, Node, Python) corre en WSL; la interfaz de Reaper por WSLg no es usable. En el servidor, Reaper para Linux comparte sistema de archivos con el backend.
 - **El workspace y el IPC viven en el sistema de archivos de Linux.** En desarrollo, Reaper los alcanza por `\\wsl.localhost\<distribución>\...`.
 - **Traducción de rutas en el adaptador de Reaper**, en los dos sentidos: de Linux a UNC en lo que envía y de UNC a Linux en lo que recibe (acepta `\\wsl.localhost\` y `\\wsl$\`, sin distinguir mayúsculas en el prefijo). Es configuración del adaptador: `COPILOT_REAPER_PATH_STYLE` vale `unc` (por defecto si existe `WSL_DISTRO_NAME`) o `identity` (si no; en el servidor); un valor inválido hace fallar el arranque. Una fuente que no traduce a Linux se devuelve como `source: null`; una ruta recibida no traducible es `invalid_daw_output`. El núcleo y las herramientas solo ven rutas de Linux.
-- **El puente se defiende solo** (el servidor puede estar comprometido o equivocarse). (1) Lista cerrada de plugins, con nombre exacto (`JS: Waveshaping Distortion`, `ReaLimit (Cockos)`, `ReaEQ (Cockos)`, `ReaComp (Cockos)`); cualquier otro, o un nombre con ruta o `.dll`/`.vst3`, da `fx_not_allowed` (el adaptador lo traduce a `daw_error`). La fuente de verdad es `ALLOWED_FX_PLUGINS` en `libs/core`, que `loadPresets` aplica a los presets; `bridge.lua` la repite (`FX_ALLOWED`) y deben mantenerse iguales. (2) El puente deriva el workspace de su ubicación (`reaper/bridge/../../workspace`) y rechaza en `import_audio` y `render` toda ruta fuera de él o con segmentos `..` (`path_outside_workspace`, que el adaptador traduce al error de dominio del mismo nombre); compara sin distinguir mayúsculas y normalizando separadores. **Con Reaper, `COPILOT_WORKSPACE` debe ser el de por defecto**: si no, el puente rechazaría todas las rutas, y el servidor lo avisa por stderr al arrancar.
+- **El puente se defiende solo** (el servidor puede estar comprometido o equivocarse). (1) Lista cerrada de plugins, con nombre exacto (`JS: Waveshaping Distortion`, `ReaLimit (Cockos)`, `ReaEQ (Cockos)`, `ReaComp (Cockos)`); cualquier otro, o un nombre con ruta o `.dll`/`.vst3`, da `fx_not_allowed` (el adaptador lo traduce a `daw_error`). La fuente de verdad es `ALLOWED_FX_PLUGINS` en `libs/core`, que `loadPresets` aplica a los presets; `bridge.lua` la repite (`FX_ALLOWED`) y deben mantenerse iguales. También es lista cerrada la de ajustes de configuración de FX (`ALLOWED_FX_CONFIG` en `libs/core`, repetida en `bridge.lua` como `FX_CONFIG_ALLOWED`): una clave o un valor no permitidos, o un plugin sin lista, dan `fx_not_allowed`, y un `config` mal formado `invalid_params`; se valida todo antes de tocar la pista. (2) El puente deriva el workspace de su ubicación (`reaper/bridge/../../workspace`) y rechaza en `import_audio` y `render` toda ruta fuera de él o con segmentos `..` (`path_outside_workspace`, que el adaptador traduce al error de dominio del mismo nombre); compara sin distinguir mayúsculas y normalizando separadores. **Con Reaper, `COPILOT_WORKSPACE` debe ser el de por defecto**: si no, el puente rechazaría todas las rutas, y el servidor lo avisa por stderr al arrancar.
 - **El puente no se fía de los valores de retorno de Reaper.** Antes de importar comprueba que el archivo existe, y después que el item tiene duración mayor que cero: una ruta sin traducir crea un item vacío sin dar error.
 - **El render es síncrono dentro del puente:** mientras renderiza no atiende nada. El trabajo asíncrono (`jobId`, `get_job_status`) vive en memoria del adaptador, que espera la respuesta y contesta el estado sin preguntar a Reaper; con `pnpm mcp:call`, que arranca un servidor por llamada, no se puede consultar un render de otra llamada. Mientras hay un render en curso, cualquier otro comando falla con `daw_busy` (no se encolan). La señal de vida del puente indica cuándo está renderizando, porque un latido se congela. Se trabaja en la pestaña de proyecto activa.
 - **Carga del puente.** En desarrollo, `pnpm reaper:bridge` carga `reaper/bridge/bridge.lua` en el Reaper abierto con `reaper.exe -nonewinst` y su ruta UNC (`COPILOT_REAPER_EXE` cambia el ejecutable). Lanzar `-nonewinst` con el puente corriendo lo detiene (conmutador): por eso el script envía `quit` si hay un puente vivo y vuelve a cargarlo. En Linux eso arranca otra instancia: en el servidor el puente se pasa como argumento al arrancar Reaper.
@@ -319,6 +332,7 @@ En modo `mentor` solo se exponen las de lectura: siete (`get_project_state`, `li
   - **Corte:** desplazamiento de la toma (`D_STARTOFFS`, `D_LENGTH`), no división, que añade un fundido. Parámetros explícitos `sourceBpm`, `offsetSec` (por defecto 0: el primer tiempo está al principio), `startBar`, `bars` y `beatsPerBar`. Sin detección del primer tiempo.
   - **Estirado:** tasa de reproducción con el tono conservado. Al importar, el puente pone el item en timebase de tiempo (`C_BEATATTACHMODE` = 0): con el valor del proyecto, un cambio de tempo vuelve a estirar el item.
   - **Parámetros de FX:** los VST de Cockos reciben valores normalizados y los JS unidades reales. Los presets se expresan por nombre de parámetro y valor mostrado (dB, Hz, %); el puente busca el valor normalizado por bisección sobre `TrackFX_FormatParamValueNormalized`.
+  - **Ajustes de configuración de FX:** se aplican con `TrackFX_SetNamedConfigParm`, que en Reaper 7.86 devuelve `false` aunque aplica el valor. Por eso el puente ignora el retorno y relee con `TrackFX_GetNamedConfigParm`; si el valor no coincide, da `param_not_found`.
   - **Render:** WAV de la mezcla del master en la selección de tiempo igual a los límites del item, con nombre único por trabajo (`workspace/renders/<UTC>-<hex>.wav`); el puente se niega si el archivo existe (`output_exists`), porque Reaper abriría un diálogo modal y bloquearía el puente. Guarda y restaura (también si falla) la selección de items y los ajustes `RENDER_FILE`, `RENDER_PATTERN`, `RENDER_FORMAT`, `RENDER_SETTINGS`, `RENDER_BOUNDSFLAG` y `RENDER_TAILFLAG`, además de la selección de tiempo. Va en su propio bloque «Copilot: render»: el primer `undo_last` tras renderizar deshace ese bloque, sin cambio visible. `durationSec` sale de la cabecera del WAV. El render no restaura la selección de items ni los ajustes `RENDER_*` del proyecto.
   - **Deshacer:** cada método mutante va en un bloque `Copilot: <acción>`; `undo` solo actúa si el último bloque lleva esa etiqueta.
   - **Medio fuera de línea:** con la preferencia «Set media offline when application is not active», el render sale en silencio. Antes de renderizar, el puente pone el medio en línea y comprueba que la fuente tiene longitud.
@@ -421,8 +435,10 @@ Un criterio es un dato, no texto libre. El esquema vive en zod en `libs/core` y 
 - **Tarea activa por sesión.** Las tareas y sus verificaciones se guardan en SQLite (tablas `tasks` y `task_verifications`). `start_task`, si sale bien, fija la tarea activa de la sesión; desde entonces cada traza lleva su `taskId`, incluida la de `start_task`. `verify_task` lleva el `taskId` de su entrada. Antes del primer `start_task`, `taskId` es `null`, igual que en las filas anteriores a F2b. `sessionId` es un UUID por arranque del servidor y `step` cuenta desde 1 en cada sesión (con `pnpm mcp:call`, que arranca un servidor por llamada, siempre es 1). `pnpm mcp:traces` imprime `task=<8 primeros caracteres>` o `-`.
 - Las trazas no llevan rutas absolutas ni la causa de los errores. Un fallo al escribir la traza o la caché se registra por stderr y no rompe la herramienta.
 - **Caché de análisis.** Clave: sha256 de los bytes del archivo, `targetBpm` (o `null`) y `revision = "<schemaVersion>.<ANALYSIS_REVISION>"`. `ANALYSIS_REVISION` es una constante de `libs/core` que se sube a mano al cambiar el método de análisis de Python. Lo leído de la caché se valida con `AudioFeaturesSchema`; si no pasa, se analiza de nuevo.
-- Un comando `export-replay` genera, por cada ejecución elegida, una carpeta con `run.json` (petición, pasos, criterios, resultados, análisis) y los audios antes y después en formato comprimido.
-- El sitio Replay solo lee esos archivos. Así el Replay muestra ejecuciones reales, no maquetas.
+- **Exportador.** `pnpm replay:export <taskId> [--title "<texto>"]` escribe en `apps/web/public/runs/<taskId>/` los archivos `run.json`, `source.mp3` y `render-<attempt>.mp3`, y regenera `apps/web/public/runs/index.json` (la más reciente primero). Sin `--title`, el título es la petición recortada a 120 caracteres. Lee la base SQLite sin crearla; `REPLAY_OUT_DIR` cambia la carpeta de salida y es solo para desarrollo. Las rutas se validan con `resolveAssetPath` y el resultado no lleva rutas absolutas. Avisa si una ejecución pasa de 15 MB. Si la tarea no existe o no tiene verificaciones, falla con `task_not_found`.
+- **`run.json`** (`ReplayRunSchema`, `schemaVersion` 1): `taskId` (uuid), `title`, `request`, `createdAt`, `target`, `criteria`, `source` y `verifications[]` (al menos una; cada una con `attempt`, `verifiedAt`, `pass`, `results` y `render`) y `steps[]`. `source` y cada `render` son `{ file, features, assets }`: el nombre del MP3 (sin carpetas), su `AudioFeatures` y su `ReplayAssets`. Cada paso es una traza sin `taskId` ni `cacheHits`.
+- **Índice** (`ReplayIndexSchema`): `{ schemaVersion: 1, runs: [{ taskId, title, createdAt, pass, attempts }] }`, con `pass` del último intento.
+- El sitio Replay solo lee esos archivos y no calcula nada. Así muestra ejecuciones reales, no maquetas.
 
 ---
 
@@ -444,7 +460,7 @@ flowchart LR
         APIS --> PS["Python"]
         APIS --> DB["SQLite"]
     end
-    DEV -- "export-replay + build" --> HOST
+    DEV -- "replay:export + build" --> HOST
     VIS["Reclutador"] --> REP
     REP -- "estado y modo Live" --> TUN
     APIS --> ANT["API de Claude"]
@@ -453,12 +469,13 @@ flowchart LR
 | Entorno | Equipo | Qué corre | Para qué |
 |---|---|---|---|
 | **Desarrollo** | PC del autor: Ryzen AI 7, 32 GB RAM, Windows con WSL | Claude Code, VS Code, servidor MCP y Python en WSL; Reaper nativo en Windows | Desarrollar, usar el bloque MCP, grabar ejecuciones para el Replay |
-| **Hosting estático** | Servicio gratuito (GitHub Pages o Cloudflare Pages) *(a comprobar)* | Sitio Replay | Portfolio siempre disponible |
+| **Hosting estático** | GitHub Pages (`https://cristianantval85.github.io/Reaper-Copilot/`) | Sitio Replay | Portfolio siempre disponible |
 | **Servidor Live** | Portátil viejo: Intel i3, 8 GB RAM, 256 GB, Ubuntu | API NestJS, agente, Reaper sin pantalla, Python, SQLite, túnel | Demo en vivo |
 | **Externos** | Anthropic, GitHub | API de Claude (solo Live), repositorio | — |
 
 Notas:
 
+- El sitio se despliega con `.github/workflows/pages.yml`: en cada push a `main` que toque `apps/web`, `libs/core`, el lockfile o el propio workflow (o a mano con `workflow_dispatch`), compila con `pnpm --filter @reaper-copilot/web build:pages` (base `/Reaper-Copilot/`, routing con `#`) y publica `apps/web/dist/browser`. En el repositorio hay que activar Settings → Pages → Source: GitHub Actions.
 - El frontend del modo Live es la misma aplicación Angular del hosting estático; llama a la API del portátil a través del túnel (CORS limitado al dominio del sitio).
 - El portátil basta para **una ejecución a la vez**: el LLM corre en la nube y el equipo solo ejecuta Reaper, el análisis y la API.
 
@@ -485,7 +502,7 @@ Lista de trabajo. Los comandos concretos se validan en la fase 4.
 ### 11.3 Aplicación
 
 - Usuario de sistema sin privilegios (por ejemplo `copilot`) dueño del workspace.
-- Dependencias: Node 24, Python 3.11+ con entorno virtual, Reaper para Linux. F1a lee MP3 con `soundfile` (libsndfile ≥ 1.1) y no necesita ffmpeg; ffmpeg solo se añadiría si una fase posterior lo requiere.
+- Dependencias: Node 24, Python 3.11+ con entorno virtual, Reaper para Linux. F1a lee MP3 con `soundfile` (libsndfile ≥ 1.1) y no necesita ffmpeg; el Replay (F3) tampoco lo necesita: comprime a MP3 con `soundfile`. ffmpeg solo se añadiría si una fase posterior lo requiere.
 - **Reaper sin pantalla:** arrancarlo sobre una pantalla virtual (Xvfb) con `bridge.lua` cargado al inicio *(a comprobar; es un spike)*. El render no necesita dispositivo de audio.
 - **Licencia de Reaper:** revisar las condiciones para una demo pública antes de desplegar.
 - Servicios `systemd` con `Restart=always` para: pantalla virtual + Reaper, API NestJS y túnel. Arranque automático al encender.
@@ -537,7 +554,7 @@ Lista de trabajo. Los comandos concretos se validan en la fase 4.
 | **1b. Comparación y trazas** | `compare_audio`, caché por sha256, SQLite con trazas | Comparar dos archivos desde Claude Code; el segundo análisis del mismo archivo sale de la caché |
 | **2a. Reaper desde MCP** | `bridge.lua`, adaptador de Reaper con traducción de rutas, `DawPort`, `FakeDaw`, herramientas de Reaper (estado, importar, tempo, cortar, estirar, presets y FX, render asíncrono, estado del trabajo, deshacer), modo `mentor` en `.mcp.json` | Desde Claude Code: importar, cortar 4 compases, estirar a 170, aplicar un preset y renderizar; el render dura lo esperado (±20 ms) medido con `analyze_audio` |
 | **2b. Tareas y verificación** | `start_task`, `verify_task`, criterios (sección 9.2), `taskId` en las trazas | El caso "loop a 170" de punta a punta desde Claude Code, verificado con criterios |
-| **3. Replay** | `export-replay`, aplicación Angular con reproductor, forma de onda, espectro y pasos; despliegue estático | URL pública con al menos tres ejecuciones reales |
+| **3. Replay** | `pnpm replay:export`, aplicación Angular con reproductor, forma de onda, espectro y pasos; despliegue estático | URL pública con al menos tres ejecuciones reales |
 | **4. Live** | Spike de Reaper sin pantalla en el portátil; `LlmPort`, bucle del agente, API NestJS, cola, invitaciones, límites; preparación del servidor y túnel | Ejecución en vivo desde la web con código de invitación y tope de gasto activo |
 | **5. Ampliaciones** | Búsqueda en la documentación de Reaper (sección 5.4), recetas por género, comparación con referencia, MIDI, stems, LLM local, otros clientes | Para la búsqueda en documentación: preguntar desde Claude Code y recibir respuesta con cita; evaluación de recuperación medida. Resto por definir |
 
@@ -554,10 +571,10 @@ El spike de Reaper sin pantalla puede adelantarse a la fase 0 si el portátil es
 - **MCP:** `@modelcontextprotocol/sdk` 1.32 o posterior. **Validación:** zod 4.
 - **TypeScript sin compilar:** Node 24 ejecuta los `.ts` directamente. Los imports relativos llevan extensión `.ts` y solo se usa sintaxis borrable (`erasableSyntaxOnly`: sin `enum`, `namespace` ni propiedades de parámetro en constructores).
 - **`check:full`:** typecheck, lint y test de todo el repositorio, más `pnpm py:test` y `nx run-many -t test:contract`.
-- **Backend Live:** NestJS. **Frontend:** Angular.
+- **Backend Live:** NestJS. **Frontend:** Angular 22.2 (`apps/web`, zoneless, routing con `#`), con `rxjs`, `tslib` y `jsdom` para las pruebas; sin librerías de gráficas ni de audio.
 - **LLM (solo Live):** `@anthropic-ai/sdk`. Su `toolRunner` está en beta; alternativa: un bucle propio detrás de `LlmPort`.
 - **Python 3.11+** con `venv` + `pip`: librosa, pyloudnorm, numpy, scipy, soundfile.
-- **Reaper** con puente en Lua y plugins de serie: nativo de Windows en desarrollo, para Linux en el servidor. **ffmpeg** (no en F1a; ver §11.3). **SQLite** con `node:sqlite` de Node 24, sin dependencia añadida (experimental; queda detrás de `StoragePort`).
+- **Reaper** con puente en Lua y plugins de serie: nativo de Windows en desarrollo, para Linux en el servidor. **ffmpeg** (no hace falta para el Replay; ver §11.3). **SQLite** con `node:sqlite` de Node 24, sin dependencia añadida (experimental; queda detrás de `StoragePort`).
 
 ### 14.2 Pruebas
 
@@ -591,11 +608,11 @@ El spike de Reaper sin pantalla puede adelantarse a la fase 0 si el portátil es
 
 ### 15.2 Preguntas abiertas
 
-1. Servicio de hosting estático y de túnel definitivos.
+1. Túnel definitivo para Live. El hosting estático está decidido: GitHub Pages.
 2. Condiciones de licencia de Reaper para la demo pública.
 3. Empaquetado de Python junto al servidor MCP para terceros.
-4. Idioma del README y de la interfaz del Replay.
-5. Qué muestras preinstaladas usar en Live y Replay (propias o con licencia libre).
+4. Cerrada (2026-11-17): README e interfaz del Replay en inglés; los documentos internos, en español.
+5. Muestras preinstaladas para Live (propias o con licencia libre). Cerrada para el Replay (2026-11-17): audio propio del autor.
 6. Modelo de Claude para el modo Live y límites concretos por visitante.
 7. Nombres y parámetros finales de los presets de FX para hardstyle y hardcore. En F2a hay tres presets provisionales (`distortion_hard`, `limiter_loud`, `eq_lowcut`) para probar el mecanismo; sus rangos y valores no son definitivos.
 8. Licencia de la documentación de Reaper: si permite ofrecer la búsqueda en el modo Live público.

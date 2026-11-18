@@ -63,9 +63,10 @@ export const FxChainSchema = z.array(
   z.strictObject({
     plugin: z.string().min(1),
     params: z.array(z.strictObject({ name: z.string().min(1), value: finite })),
+    config: z.array(z.strictObject({ name: z.string().min(1), value: z.string() })).default([]),
   }),
 );
-export type FxChain = z.infer<typeof FxChainSchema>;
+export type FxChain = z.input<typeof FxChainSchema>;
 
 export const AppliedFxChainSchema = z.strictObject({
   trackId: TrackIdSchema,
@@ -73,6 +74,7 @@ export const AppliedFxChainSchema = z.strictObject({
     z.strictObject({
       plugin: z.string(),
       params: z.array(z.strictObject({ name: z.string(), text: z.string() })),
+      config: z.array(z.strictObject({ name: z.string(), value: z.string() })),
     }),
   ),
 });
@@ -129,6 +131,15 @@ export const ALLOWED_FX_PLUGINS = [
   "ReaComp (Cockos)",
 ] as const;
 
+/**
+ * Closed list of plugin configuration settings a preset may set (TrackFX_SetNamedConfigParm), per plugin: the key
+ * pattern and the value pattern. Single source of truth in TypeScript; reaper/bridge/bridge.lua repeats it
+ * (FX_CONFIG_ALLOWED) and must be kept in sync.
+ */
+export const ALLOWED_FX_CONFIG: Readonly<Record<string, { key: RegExp; value: RegExp }>> = {
+  "ReaEQ (Cockos)": { key: /^BANDENABLED[0-9]$/, value: /^[01]$/ },
+};
+
 const PresetParamSchema = z.union([
   z.strictObject({ knob: knobName }),
   z.strictObject({ value: finite }),
@@ -143,6 +154,7 @@ export const PresetSchema = z
         z.strictObject({
           plugin: z.string().min(1),
           params: z.record(z.string().min(1), PresetParamSchema),
+          config: z.record(z.string().min(1), z.string()).optional(),
         }),
       )
       .min(1),

@@ -47,6 +47,19 @@ describe("loadPresets", () => {
     await expect(loadPresets(await dirWith({ "demo.json": bad }))).rejects.toThrow(/demo\.json/);
   });
 
+  it("accepts an allowed config and rejects a key, plugin or value outside the list", async () => {
+    const eq = (config: Record<string, string>, plugin = "ReaEQ (Cockos)") => ({
+      ...valid,
+      fx: [{ plugin, params: { Threshold: { knob: "t" } }, config }],
+    });
+    await expect(loadPresets(await dirWith({ "demo.json": eq({ BANDENABLED4: "1" }) }))).resolves.toHaveLength(1);
+    await expect(loadPresets(await dirWith({ "demo.json": eq({ FOO: "1" }) }))).rejects.toThrow(/demo\.json/);
+    await expect(loadPresets(await dirWith({ "demo.json": eq({ BANDENABLED4: "2" }) }))).rejects.toThrow(/demo\.json/);
+    await expect(loadPresets(await dirWith({ "demo.json": eq({ BANDENABLED4: "1" }, "ReaLimit (Cockos)") }))).rejects.toThrow(
+      /demo\.json/,
+    );
+  });
+
   it("fails when the id differs from the file name", async () => {
     await expect(loadPresets(await dirWith({ "other.json": valid }))).rejects.toThrow(/other\.json/);
   });

@@ -253,6 +253,12 @@ local FX_ALLOWED = {
   ["ReaComp (Cockos)"] = true,
 }
 
+-- Closed list of FX configuration keys per plugin, and the values each accepts. Keep equal to
+-- ALLOWED_FX_CONFIG in libs/core/src/daw.ts (Lua patterns instead of regular expressions).
+local FX_CONFIG_ALLOWED = {
+  ["ReaEQ (Cockos)"] = { key = "^BANDENABLED%d$", value = "^[01]$" },
+}
+
 -- Lower case, one separator kind, no repeated separators: Windows and UNC paths compare equal.
 local function normalize_path(p)
   return (p:gsub("\\", "/"):gsub("/+", "/"):lower())
@@ -465,6 +471,16 @@ function methods.apply_fx_chain(params)
         fail("invalid_params", "each parameter needs a name and a numeric value")
       end
     end
+    if entry.config ~= nil and type(entry.config) ~= "table" then fail("invalid_params", "config must be an array") end
+    for _, c in ipairs(entry.config or {}) do
+      if type(c) ~= "table" or type(c.name) ~= "string" or type(c.value) ~= "string" then
+        fail("invalid_params", "each config setting needs a string name and a string value")
+      end
+      local allowed = FX_CONFIG_ALLOWED[entry.plugin]
+      if not allowed or not c.name:match(allowed.key) or not c.value:match(allowed.value) then
+        fail("fx_not_allowed", "config setting is not in the allowed list")
+      end
+    end
   end
   return undoable("apply_fx_chain", function()
     local added = {}
@@ -482,7 +498,18 @@ function methods.apply_fx_chain(params)
           local _, text = reaper.TrackFX_GetFormattedParamValue(track, fx, index, "")
           out[#out + 1] = { name = p.name, text = text }
         end
-        applied[#applied + 1] = { plugin = entry.plugin, params = out }
+        local config_out = array()
+        for _, c in ipairs(entry.config or {}) do
+          -- ReaEQ returns false from Set even when it applies the value (checked on Reaper 7.86), so the
+          -- return value proves nothing: read the setting back and require what was asked.
+          reaper.TrackFX_SetNamedConfigParm(track, fx, c.name, c.value)
+          local known, value = reaper.TrackFX_GetNamedConfigParm(track, fx, c.name)
+          if not known or value ~= c.value then
+            fail("param_not_found", "the plugin did not take the setting " .. c.name)
+          end
+          config_out[#config_out + 1] = { name = c.name, value = value }
+        end
+        applied[#applied + 1] = { plugin = entry.plugin, params = out, config = config_out }
       end
       return { trackId = params.trackId, fx = applied }
     end)

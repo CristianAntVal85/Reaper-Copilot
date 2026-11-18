@@ -8,5 +8,6 @@ export * from "./daw.ts";
 export * from "./errors.ts";
 export * from "./feature-diff.ts";
 export * from "./ports.ts";
+export * from "./replay.ts";
 export * from "./storage.ts";
 export * from "./task.ts";

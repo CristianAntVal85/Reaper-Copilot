@@ -3,7 +3,7 @@ import nx from "@nx/eslint-plugin";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["**/node_modules/", "**/dist/", ".nx/", "spikes/", "specs/"] },
+  { ignores: ["**/node_modules/", "**/dist/", ".nx/", "**/.angular/", "spikes/", "specs/"] },
   js.configs.recommended,
   tseslint.configs.recommended,
   {

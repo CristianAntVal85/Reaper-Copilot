@@ -79,15 +79,24 @@ describe("apply_fx_chain", () => {
     const call = daw.calls.at(-1);
     expect(call?.method).toBe("applyFxChain");
     expect(call?.args[1]).toEqual([
-      { plugin: "JS: Waveshaping Distortion", params: [{ name: "Distortion (%)", value: 80 }] },
+      { plugin: "JS: Waveshaping Distortion", params: [{ name: "Distortion (%)", value: 80 }], config: [] },
       {
         plugin: "ReaLimit (Cockos)",
         params: [
           { name: "Threshold", value: -6 },
           { name: "Ceiling", value: -0.3 },
         ],
+        config: [],
       },
     ]);
     expect(applyFxChain.risk).toBe("write");
+  });
+
+  it("sends the preset config to the DAW and returns it", async () => {
+    const daw = new FakeDaw();
+    const trackId = await trackOf(daw);
+    const out = applyFxChain.outputSchema.parse(await applyFxChain.handler({ trackId, preset: "eq_lowcut" }, context(daw)));
+    expect((daw.calls.at(-1)?.args[1] as { config: unknown }[])[0]?.config).toEqual([{ name: "BANDENABLED4", value: "1" }]);
+    expect(out.fx[0]?.config).toEqual([{ name: "BANDENABLED4", value: "1" }]);
   });
 });

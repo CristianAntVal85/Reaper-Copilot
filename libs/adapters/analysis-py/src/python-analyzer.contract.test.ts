@@ -1,9 +1,14 @@
 import { existsSync } from "node:fs";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { asAssetPath, AudioFeaturesSchema, CopilotError } from "@reaper-copilot/core";
+import {
+  asAssetPath,
+  AudioFeaturesSchema,
+  CopilotError,
+  ReplayAssetsSchema,
+} from "@reaper-copilot/core";
 import { DEFAULT_PYTHON_PATH, PythonAnalyzer } from "./python-analyzer.ts";
 
 // Real Python, real librosa. Run with `pnpm test:contract` (part of check:full).
@@ -47,7 +52,9 @@ let wavPath: string;
 
 beforeAll(async () => {
   if (!existsSync(DEFAULT_PYTHON_PATH)) {
-    throw new Error(`Python environment missing at ${DEFAULT_PYTHON_PATH}: run pnpm py:setup first`);
+    throw new Error(
+      `Python environment missing at ${DEFAULT_PYTHON_PATH}: run pnpm py:setup first`,
+    );
   }
   dir = await mkdtemp(join(tmpdir(), "analysis-py-contract-"));
   wavPath = join(dir, "clicks 150.wav"); // a space on purpose
@@ -61,7 +68,9 @@ describe("PythonAnalyzer with the real analysis package", () => {
   const analyzer = new PythonAnalyzer({ timeoutMs: 150_000 });
 
   it("analyzes a generated WAV and the result passes the contract", async () => {
-    const features = await analyzer.analyze(asAssetPath(wavPath), { targetBpm: 150 });
+    const features = await analyzer.analyze(asAssetPath(wavPath), {
+      targetBpm: 150,
+    });
     expect(AudioFeaturesSchema.safeParse(features).success).toBe(true);
     expect(features.file.sampleRate).toBe(SAMPLE_RATE);
     expect(features.file.channels).toBe(2);
@@ -88,5 +97,22 @@ describe("PythonAnalyzer with the real analysis package", () => {
     const error = await analyzer.analyze(asAssetPath(textPath)).catch((e) => e);
     expect(error).toBeInstanceOf(CopilotError);
     expect(error.code).toBe("unsupported_format");
+  });
+
+  it("builds replay assets from a generated WAV: valid output and an mp3 on disk", async () => {
+    const output = join(dir, "replay out.mp3");
+    const assets = await analyzer.replayAssets(asAssetPath(wavPath), output);
+    expect(ReplayAssetsSchema.safeParse(assets).success).toBe(true);
+    expect(assets.durationSec).toBeCloseTo(10, 1);
+    expect(existsSync(output)).toBe(true);
+  });
+
+  it("refuses to overwrite an existing output", async () => {
+    const output = join(dir, "existing.mp3");
+    await writeFile(output, "keep");
+    const error = await analyzer.replayAssets(asAssetPath(wavPath), output).catch((e) => e);
+    expect(error).toBeInstanceOf(CopilotError);
+    expect(error.code).toBe("analysis_failed");
+    expect(await readFile(output, "utf8")).toBe("keep");
   });
 });

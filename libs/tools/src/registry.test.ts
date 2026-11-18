@@ -40,7 +40,7 @@ describe("createToolRegistry", () => {
     const t = tool("reader", "read");
     const ctx = {
       workspaceRoot: "/ws",
-      analyzer: { analyze: async () => Promise.reject() },
+      analyzer: { analyze: async () => Promise.reject(), replayAssets: async () => Promise.reject() },
       storage: new FakeStorage(),
       log: () => {},
     };

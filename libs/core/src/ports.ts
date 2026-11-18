@@ -13,6 +13,7 @@ import type {
   TrackRef,
 } from "./daw.ts";
 import type { AudioFeatures } from "./audio-features.ts";
+import type { ReplayAssets } from "./replay.ts";
 import type { Task, Verification } from "./task.ts";
 import type { AnalysisCacheKey, ToolCallTrace } from "./storage.ts";
 
@@ -22,14 +23,16 @@ export interface AnalyzeOptions {
 
 export interface AnalyzerPort {
   analyze(path: AssetPath, options?: AnalyzeOptions): Promise<AudioFeatures>;
+  /** Writes an MP3 of `input` to `output` (which must not exist) and returns its chart data. */
+  replayAssets(input: AssetPath, output: string): Promise<ReplayAssets>;
 }
 
 export interface StoragePort {
   getCachedAnalysis(key: AnalysisCacheKey): Promise<AudioFeatures | null>;
   putCachedAnalysis(key: AnalysisCacheKey, features: AudioFeatures): Promise<void>;
   recordToolCall(trace: ToolCallTrace): Promise<void>;
-  /** Most recent first. */
-  listToolCalls(options?: { limit?: number }): Promise<ToolCallTrace[]>;
+  /** Most recent first. `taskId` keeps only the calls attributed to that task. */
+  listToolCalls(options?: { limit?: number; taskId?: string }): Promise<ToolCallTrace[]>;
   /** Rejects a task that fails `TaskSchema` or whose `taskId` already exists. */
   createTask(task: Task): Promise<void>;
   getTask(taskId: string): Promise<Task | null>;

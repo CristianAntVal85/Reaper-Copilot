@@ -2,11 +2,13 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import {
   AudioFeaturesSchema,
+  ReplayAssetsSchema,
   CopilotError,
   type AnalyzeOptions,
   type AnalyzerPort,
   type AssetPath,
   type AudioFeatures,
+  type ReplayAssets,
 } from "@reaper-copilot/core";
 
 export interface PythonAnalyzerOptions {
@@ -16,6 +18,16 @@ export interface PythonAnalyzerOptions {
   timeoutMs?: number;
   /** Cap on the bytes accepted from stdout; the process is killed beyond it. */
   maxOutputBytes?: number;
+}
+
+/** The part of a zod schema used here; the adapter does not depend on zod directly. */
+interface Parser<T> {
+  safeParse(value: unknown):
+    | { success: true; data: T }
+    | {
+        success: false;
+        error: { issues: { path: PropertyKey[]; message: string }[] };
+      };
 }
 
 export const DEFAULT_TIMEOUT_MS = 120_000;
@@ -80,6 +92,20 @@ export class PythonAnalyzer implements AnalyzerPort {
     }
   }
 
+  async replayAssets(input: AssetPath, output: string): Promise<ReplayAssets> {
+    const result = await this.#run([
+      "-m",
+      "analysis",
+      "replay-assets",
+      "--out",
+      output,
+      "--",
+      input,
+    ]);
+    if (result.code !== 0) throw this.#exitError(result);
+    return this.#parse(result.stdout, ReplayAssetsSchema);
+  }
+
   async analyze(path: AssetPath, options: AnalyzeOptions = {}): Promise<AudioFeatures> {
     const args = ["-m", "analysis", "analyze"];
     if (options.targetBpm !== undefined) {
@@ -94,24 +120,28 @@ export class PythonAnalyzer implements AnalyzerPort {
     const result = await this.#run(args);
     if (result.code !== 0) throw this.#exitError(result);
 
+    return this.#parse(result.stdout, AudioFeaturesSchema);
+  }
+
+  #parse<T>(stdout: string, schema: Parser<T>): T {
     let parsed: unknown;
     try {
-      parsed = JSON.parse(result.stdout);
+      parsed = JSON.parse(stdout);
     } catch (cause) {
       throw new CopilotError("invalid_analysis_output", "analyzer output is not valid JSON", {
         cause,
       });
     }
-    const checked = AudioFeaturesSchema.safeParse(parsed);
+    const checked = schema.safeParse(parsed);
     if (!checked.success) {
       const issues = checked.error.issues
         .slice(0, 5)
-        .map((issue) => `${issue.path.join(".") || "(root)"}: ${issue.message}`)
+        .map((issue) => `${issue.path.map(String).join(".") || "(root)"}: ${issue.message}`)
         .join("; ");
       throw new CopilotError(
         "invalid_analysis_output",
         `analyzer output does not match the contract (${issues})`,
-        { cause: checked.error },
+        { cause: new Error(issues) },
       );
     }
     return checked.data;

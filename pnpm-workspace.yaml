@@ -4,5 +4,12 @@ packages:
   - "apps/*"
 
 # The nx postinstall only prepares optional extras (it swallows its own errors).
+# esbuild's postinstall validates/links its platform binary (used by the Angular build).
+# @parcel/watcher, lmdb and msgpackr-extract (Angular CLI) ship prebuilt platform binaries
+# as optional packages; their install scripts only fall back to a native compile.
 allowBuilds:
   nx: false
+  esbuild: true
+  "@parcel/watcher": false
+  lmdb: false
+  msgpackr-extract: false
